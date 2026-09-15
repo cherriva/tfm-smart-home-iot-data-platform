@@ -1,0 +1,428 @@
+{
+  "id": null,
+  "uid": "tfm-activity",
+  "title": "04 - Automations & Activity",
+  "description": "Activaciones observables, cambios de estado y últimas acciones. La atribución causal a automatizaciones requiere telemetría de ejecución de Home Assistant.",
+  "tags": [
+    "tfm",
+    "smart-home",
+    "activity",
+    "devices"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 41,
+  "version": 2,
+  "refresh": "30s",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Eventos de actividad",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT count(*) AS value FROM tfm.silver.matter_events WHERE domain IN ('light', 'switch', 'button', 'event', 'binary_sensor', 'lock') AND $__timeFilter(event_time)",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "orientation": "auto",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Dispositivos con actividad",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT count(DISTINCT coalesce(element_at(attributes, 'original_entity_id'), entity_id)) AS value FROM tfm.silver.matter_events WHERE domain IN ('light', 'switch', 'button', 'event', 'binary_sensor', 'lock') AND $__timeFilter(event_time)",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "orientation": "auto",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Estados activos",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT count(*) AS value FROM tfm.silver.matter_events WHERE lower(state) IN ('on', 'open', 'unlocked', 'active', 'detected') AND $__timeFilter(event_time)",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "orientation": "auto",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Pulsaciones y eventos",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT count(*) AS value FROM tfm.silver.matter_events WHERE domain IN ('button', 'event') AND $__timeFilter(event_time)",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "orientation": "auto",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Cambios de estado por dispositivo",
+      "gridPos": {
+        "h": 10,
+        "w": 16,
+        "x": 0,
+        "y": 5
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT event_time AS time, coalesce(element_at(attributes, 'original_entity_id'), entity_id) AS metric, CAST(CASE WHEN lower(state) IN ('on', 'open', 'unlocked', 'active', 'detected') THEN 1 WHEN lower(state) IN ('off', 'closed', 'locked', 'inactive', 'clear') THEN 0 END AS DOUBLE) AS value FROM tfm.silver.matter_events WHERE domain IN ('light', 'switch', 'binary_sensor', 'lock') AND lower(state) IN ('on', 'open', 'unlocked', 'active', 'detected', 'off', 'closed', 'locked', 'inactive', 'clear') AND $__timeFilter(event_time) ORDER BY event_time, metric",
+          "format": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Eventos de actividad por hora",
+      "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 16,
+        "y": 5
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT date_trunc('hour', event_time) AS time, domain AS metric, count(*) AS value FROM tfm.silver.matter_events WHERE domain IN ('light', 'switch', 'button', 'event', 'binary_sensor', 'lock') AND $__timeFilter(event_time) GROUP BY 1, 2 ORDER BY 1, 2",
+          "format": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "bargauge",
+      "title": "Número de eventos por dispositivo",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 15
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT coalesce(element_at(attributes, 'original_entity_id'), entity_id) AS metric, CAST(count(*) AS DOUBLE) AS value FROM tfm.silver.matter_events WHERE domain IN ('light', 'switch', 'button', 'event', 'binary_sensor', 'lock') AND $__timeFilter(event_time) GROUP BY 1 ORDER BY value DESC LIMIT 15",
+          "format": 1
+        }
+      ],
+      "transformations": [
+        {
+          "id": "rowsToFields",
+          "options": {
+            "mappings": [
+              {
+                "fieldName": "metric",
+                "handlerKey": "field.name"
+              },
+              {
+                "fieldName": "value",
+                "handlerKey": "field.value"
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "continuous-GrYlRd"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      }
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Estado actual de dispositivos",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 15
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "WITH latest AS (SELECT coalesce(element_at(attributes, 'original_entity_id'), entity_id) AS entity_id, domain, replace(coalesce(friendly_name, entity_id), '[SYN] ', '') AS friendly_name, state AS current_state, event_time AS last_event, row_number() OVER (PARTITION BY coalesce(element_at(attributes, 'original_entity_id'), entity_id) ORDER BY event_time DESC, bronze_timestamp DESC) AS rn FROM tfm.silver.matter_events WHERE domain IN ('light', 'switch', 'button', 'event', 'binary_sensor', 'lock')) SELECT entity_id, domain, friendly_name, current_state, last_event FROM latest WHERE rn = 1 ORDER BY last_event DESC",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Distribución de estados",
+      "gridPos": {
+        "h": 8,
+        "w": 10,
+        "x": 0,
+        "y": 24
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT domain, state, count(*) AS events, count(DISTINCT entity_id) AS entities FROM tfm.silver.matter_events WHERE domain IN ('light', 'switch', 'button', 'event', 'binary_sensor', 'lock') AND $__timeFilter(event_time) GROUP BY domain, state ORDER BY events DESC",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Últimas acciones",
+      "gridPos": {
+        "h": 8,
+        "w": 14,
+        "x": 10,
+        "y": 24
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT event_time, domain, coalesce(element_at(attributes, 'original_entity_id'), entity_id) AS entity_id, replace(coalesce(friendly_name, entity_id), '[SYN] ', '') AS friendly_name, state FROM tfm.silver.matter_events WHERE domain IN ('light', 'switch', 'button', 'event', 'binary_sensor', 'lock') ORDER BY event_time DESC LIMIT 50",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "status": "passed",
+  "run_id": "week1_b9b5c733d7fe",
+  "timestamp": "2026-09-13T15:49:03.408386+00:00",
+  "transport": "mqtt",
+  "restart_verified": true,
+  "bronze_observations": 9,
+  "silver_unique": 2,
+  "quarantined": 5,
+  "gold_events": 2,
+  "iceberg": {
+    "iot_bronze.matter_events": {
+      "ddl": "CREATE TABLE tfm.iot_bronze.matter_events (\n   event_id varchar,\n   source varchar,\n   entity_id varchar,\n   domain varchar,\n   state varchar,\n   unit varchar,\n   device_class varchar,\n   area_id varchar,\n   friendly_name varchar,\n   attributes_json varchar,\n   event_timestamp varchar,\n   updated_timestamp varchar,\n   ingestion_timestamp varchar,\n   bridge_timestamp varchar,\n   mqtt_topic varchar,\n   quality_status varchar,\n   quality_flag varchar,\n   quality_rules_version varchar,\n   quality_config varchar,\n   schema_version integer,\n   numeric_state double,\n   attributes map(varchar, varchar),\n   quality_errors array(varchar),\n   quality_warnings array(varchar),\n   event_time timestamp(6) with time zone,\n   updated_time timestamp(6) with time zone,\n   ingestion_time timestamp(6) with time zone,\n   bridge_time timestamp(6) with time zone,\n   observation_id varchar,\n   entity_key varchar,\n   raw_value varchar,\n   kafka_topic varchar,\n   kafka_partition integer,\n   kafka_offset bigint,\n   kafka_timestamp timestamp(6) with time zone,\n   bronze_timestamp timestamp(6) with time zone,\n   processing_time timestamp(6) with time zone,\n   event_date date\n)\nWITH (\n   compression_codec = 'ZSTD',\n   format = 'PARQUET',\n   format_version = 2,\n   location = 's3a://tfm-lakehouse/iot_bronze/matter_events',\n   partitioning = ARRAY['day(kafka_timestamp)']\n)",
+      "snapshots": 7
+    },
+    "iot_silver.matter_events": {
+      "ddl": "CREATE TABLE tfm.iot_silver.matter_events (\n   event_id varchar,\n   source varchar,\n   entity_id varchar,\n   domain varchar,\n   state varchar,\n   unit varchar,\n   device_class varchar,\n   area_id varchar,\n   friendly_name varchar,\n   attributes_json varchar,\n   event_timestamp varchar,\n   updated_timestamp varchar,\n   ingestion_timestamp varchar,\n   bridge_timestamp varchar,\n   mqtt_topic varchar,\n   quality_status varchar,\n   quality_flag varchar,\n   quality_rules_version varchar,\n   quality_config varchar,\n   schema_version integer,\n   numeric_state double,\n   attributes map(varchar, varchar),\n   quality_errors array(varchar),\n   quality_warnings array(varchar),\n   event_time timestamp(6) with time zone,\n   updated_time timestamp(6) with time zone,\n   ingestion_time timestamp(6) with time zone,\n   bridge_time timestamp(6) with time zone,\n   observation_id varchar,\n   entity_key varchar,\n   raw_value varchar,\n   kafka_topic varchar,\n   kafka_partition integer,\n   kafka_offset bigint,\n   kafka_timestamp timestamp(6) with time zone,\n   bronze_timestamp timestamp(6) with time zone,\n   processing_time timestamp(6) with time zone,\n   event_date date\n)\nWITH (\n   compression_codec = 'ZSTD',\n   format = 'PARQUET',\n   format_version = 2,\n   location = 's3a://tfm-lakehouse/iot_silver/matter_events',\n   partitioning = ARRAY['day(kafka_timestamp)']\n)",
+      "snapshots": 7
+    },
+    "iot_gold.entity_5m": {
+      "ddl": "CREATE TABLE tfm.iot_gold.entity_5m (\n   source varchar,\n   entity_id varchar,\n   domain varchar,\n   unit varchar,\n   window_start timestamp(6) with time zone,\n   window_end timestamp(6) with time zone,\n   event_count bigint,\n   valid_event_count bigint,\n   numeric_event_count bigint,\n   avg_numeric_state double,\n   min_numeric_state double,\n   max_numeric_state double,\n   last_event_time timestamp(6) with time zone,\n   event_date date\n)\nWITH (\n   compression_codec = 'ZSTD',\n   format = 'PARQUET',\n   format_version = 2,\n   location = 's3a://tfm-lakehouse/iot_gold/entity_5m',\n   partitioning = ARRAY['day(window_start)']\n)",
+      "snapshots": 7
+    },
+    "iot_quality.quarantine_events": {
+      "ddl": "CREATE TABLE tfm.iot_quality.quarantine_events (\n   event_id varchar,\n   source varchar,\n   entity_id varchar,\n   domain varchar,\n   state varchar,\n   unit varchar,\n   device_class varchar,\n   area_id varchar,\n   friendly_name varchar,\n   attributes_json varchar,\n   event_timestamp varchar,\n   updated_timestamp varchar,\n   ingestion_timestamp varchar,\n   bridge_timestamp varchar,\n   mqtt_topic varchar,\n   quality_status varchar,\n   quality_flag varchar,\n   quality_rules_version varchar,\n   quality_config varchar,\n   schema_version integer,\n   numeric_state double,\n   attributes map(varchar, varchar),\n   quality_errors array(varchar),\n   quality_warnings array(varchar),\n   event_time timestamp(6) with time zone,\n   updated_time timestamp(6) with time zone,\n   ingestion_time timestamp(6) with time zone,\n   bridge_time timestamp(6) with time zone,\n   observation_id varchar,\n   entity_key varchar,\n   raw_value varchar,\n   kafka_topic varchar,\n   kafka_partition integer,\n   kafka_offset bigint,\n   kafka_timestamp timestamp(6) with time zone,\n   bronze_timestamp timestamp(6) with time zone,\n   processing_time timestamp(6) with time zone,\n   event_date date\n)\nWITH (\n   compression_codec = 'ZSTD',\n   format = 'PARQUET',\n   format_version = 2,\n   location = 's3a://tfm-lakehouse/iot_quality/quarantine_events',\n   partitioning = ARRAY['day(kafka_timestamp)']\n)",
+      "snapshots": 5
+    }
+  },
+  "grafana": {
+    "queries_passed": 61,
+    "queries_with_data": 61
+  }
+}

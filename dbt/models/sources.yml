@@ -1,0 +1,36 @@
+version: 2
+sources:
+  - name: iot
+    database: tfm
+    schema: iot_silver
+    tables:
+      - name: aemet_daily
+      - name: datadis_consumption_hourly
+  - name: analytical
+    database: tfm
+    schema: silver
+    tables:
+      - name: environment_events
+models:
+  - name: stg_aemet_daily
+    columns:
+      - name: observation_date
+        tests: [not_null]
+      - name: station_id
+        tests: [not_null]
+  - name: stg_environment_events
+    columns:
+      - name: event_id
+        tests: [not_null]
+      - name: room_name
+        tests: [not_null]
+  - name: gold_environment_daily
+    columns:
+      - name: observation_date
+        tests: [not_null]
+      - name: room_id
+        tests: [not_null]
+  - name: gold_grid_energy_daily
+    columns:
+      - name: observation_date
+        tests: [not_null]

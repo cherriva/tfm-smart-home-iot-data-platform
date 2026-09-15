@@ -1,0 +1,12 @@
+tfm_trino:
+  target: local
+  outputs:
+    local:
+      type: trino
+      method: none
+      user: dbt
+      host: trino
+      port: 8080
+      catalog: tfm
+      schema: staging
+      threads: 2

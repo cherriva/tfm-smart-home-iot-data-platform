@@ -1,0 +1,14 @@
+name: tfm_smart_home
+version: '1.0.0'
+config-version: 2
+profile: tfm_trino
+model-paths: [models]
+test-paths: [tests]
+models:
+  tfm_smart_home:
+    staging:
+      +schema: staging
+      +materialized: view
+    marts:
+      +schema: gold
+      +materialized: view

@@ -1,0 +1,609 @@
+{
+  "id": null,
+  "uid": "tfm-quality",
+  "title": "04 - Calidad de la plataforma IoT",
+  "description": "Calidad de eventos, latencia, frescura y diferencias entre las capas de datos.",
+  "tags": [
+    "tfm",
+    "smart-home",
+    "quality",
+    "observability"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 41,
+  "version": 3,
+  "refresh": "30s",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Observaciones evaluadas (Bronze)",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT count(*) AS value FROM tfm.iot_quality.events WHERE $__timeFilter(kafka_timestamp)",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "orientation": "auto",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Válidas sin duplicados (%)",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT CAST(round(100.0 * sum(CASE WHEN quality_status <> 'quarantined' AND delivery_rank = 1 THEN 1 ELSE 0 END) / nullif(count(*), 0), 2) AS DOUBLE) AS value FROM tfm.iot_quality.events WHERE $__timeFilter(kafka_timestamp)",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "orientation": "auto",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Latencia media de ingesta",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT round(avg(date_diff('millisecond', event_time, ingestion_time)) / 1000.0, 3) AS value FROM tfm.iot_quality.events WHERE event_time IS NOT NULL AND ingestion_time IS NOT NULL AND $__timeFilter(kafka_timestamp)",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "orientation": "auto",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Entidades sin valor numérico",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT count(DISTINCT CASE WHEN numeric_state IS NULL THEN entity_id END) AS value FROM tfm.iot_quality.events WHERE $__timeFilter(kafka_timestamp)",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "orientation": "auto",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Eventos recibidos por minuto",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT date_trunc('minute', ingestion_time) AS time, count(*) AS value FROM tfm.iot_quality.events WHERE $__timeFilter(kafka_timestamp) GROUP BY 1 ORDER BY 1",
+          "format": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Latencia evento → ingesta",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT date_trunc('minute', ingestion_time) AS time, round(avg(date_diff('millisecond', event_time, ingestion_time)) / 1000.0, 3) AS value FROM tfm.iot_quality.events WHERE event_time IS NOT NULL AND ingestion_time IS NOT NULL AND $__timeFilter(kafka_timestamp) GROUP BY 1 ORDER BY 1",
+          "format": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "bargauge",
+      "title": "Calidad por tipo de evento",
+      "gridPos": {
+        "h": 9,
+        "w": 10,
+        "x": 0,
+        "y": 14
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT quality_flag AS metric, CAST(count(*) AS DOUBLE) AS value FROM tfm.iot_quality.events WHERE $__timeFilter(kafka_timestamp) GROUP BY quality_flag ORDER BY value DESC",
+          "format": 1
+        }
+      ],
+      "transformations": [
+        {
+          "id": "rowsToFields",
+          "options": {
+            "mappings": [
+              {
+                "fieldName": "metric",
+                "handlerKey": "field.name"
+              },
+              {
+                "fieldName": "value",
+                "handlerKey": "field.value"
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "continuous-GrYlRd"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      }
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Calidad y latencia por dominio",
+      "gridPos": {
+        "h": 9,
+        "w": 14,
+        "x": 10,
+        "y": 14
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT domain, count(*) AS events, sum(CASE WHEN (quality_status = 'quarantined' OR delivery_rank > 1) THEN 1 ELSE 0 END) AS invalid_events, round(100.0 * sum(CASE WHEN quality_status <> 'quarantined' AND delivery_rank = 1 THEN 1 ELSE 0 END) / nullif(count(*), 0), 2) AS valid_percent, round(avg(date_diff('millisecond', event_time, ingestion_time)) / 1000.0, 3) AS avg_latency_s FROM tfm.iot_quality.events WHERE $__timeFilter(kafka_timestamp) GROUP BY domain ORDER BY events DESC",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Entidades con mayor latencia",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 23
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT coalesce(element_at(attributes, 'original_entity_id'), entity_id) AS entity_id, count(*) AS events, round(avg(date_diff('millisecond', event_time, ingestion_time)) / 1000.0, 3) AS avg_latency_s, round(max(date_diff('millisecond', event_time, ingestion_time)) / 1000.0, 3) AS max_latency_s, max(event_time) AS last_event FROM tfm.iot_quality.events WHERE event_time IS NOT NULL AND ingestion_time IS NOT NULL AND $__timeFilter(kafka_timestamp) GROUP BY 1 ORDER BY avg_latency_s DESC LIMIT 50",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Campos incompletos y frescura",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 23
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT count(*) AS total_events, sum(CASE WHEN entity_id IS NULL THEN 1 ELSE 0 END) AS missing_entity, sum(CASE WHEN state IS NULL THEN 1 ELSE 0 END) AS missing_state, sum(CASE WHEN raw_value IS NULL THEN 1 ELSE 0 END) AS missing_raw_value, sum(CASE WHEN attributes IS NULL THEN 1 ELSE 0 END) AS missing_attributes, max(ingestion_time) AS latest_ingestion FROM tfm.iot_quality.events WHERE $__timeFilter(kafka_timestamp)",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "bargauge",
+      "title": "Eventos por dominio",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 32
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT coalesce(domain, 'desconocido') AS metric, CAST(count(*) AS DOUBLE) AS value FROM tfm.iot_quality.events WHERE $__timeFilter(kafka_timestamp) GROUP BY 1 ORDER BY value DESC",
+          "format": 1
+        }
+      ],
+      "transformations": [
+        {
+          "id": "rowsToFields",
+          "options": {
+            "mappings": [
+              {
+                "fieldName": "metric",
+                "handlerKey": "field.name"
+              },
+              {
+                "fieldName": "value",
+                "handlerKey": "field.value"
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "continuous-GrYlRd"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      }
+    },
+    {
+      "id": 12,
+      "type": "table",
+      "title": "Cobertura temporal del histórico",
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 8,
+        "y": 32
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT count(*) AS events, count(DISTINCT coalesce(element_at(attributes, 'original_entity_id'), entity_id)) AS entities, min(event_time) AS first_event, max(event_time) AS last_event FROM tfm.iot_quality.events",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 100,
+      "type": "table",
+      "title": "Cuarentena: causas explícitas",
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT kafka_timestamp, coalesce(element_at(attributes, 'original_entity_id'), entity_id) AS entity_id, state, array_join(quality_errors, ', ') AS quality_errors, array_join(quality_warnings, ', ') AS quality_warnings FROM tfm.iot_quality.quarantine_events ORDER BY kafka_timestamp DESC LIMIT 100",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 101,
+      "type": "table",
+      "title": "Entregas duplicadas",
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 49,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT kafka_timestamp, coalesce(element_at(attributes, 'original_entity_id'), entity_id) AS entity_id, event_id, delivery_rank, array_join(quality_errors, ', ') AS quality_errors FROM tfm.iot_quality.duplicate_events ORDER BY kafka_timestamp DESC LIMIT 100",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 102,
+      "type": "table",
+      "title": "Sensores sin actividad o nunca recibidos",
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 58,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT replace(entity_id, '.synthetic_', '.') AS entity_id, activity_status, last_received, seconds_since_received, inactivity_seconds FROM tfm.iot_quality.sensor_activity WHERE activity_status <> 'active' ORDER BY entity_id",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    }
+  ]
+}

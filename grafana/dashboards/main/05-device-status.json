@@ -1,0 +1,790 @@
+{
+  "id": null,
+  "uid": "tfm-device-status",
+  "title": "05 - Devices & Reliability",
+  "description": "¿Qué dispositivos están fallando o degradándose? Último valor, estado operativo, alertas y frescura por entidad.",
+  "tags": [
+    "tfm",
+    "smart-home",
+    "devices",
+    "status"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 41,
+  "version": 2,
+  "refresh": "30s",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Entidades controladas",
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT count(DISTINCT entity_id) AS value FROM tfm.silver.matter_events WHERE (element_at(attributes, 'synthetic') = 'true' OR source = 'sonoff')",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "orientation": "auto",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Actualizadas < 15 min",
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "WITH latest AS (SELECT entity_id, domain, event_time, row_number() OVER (PARTITION BY entity_id ORDER BY event_time DESC, bronze_timestamp DESC) AS rn FROM tfm.silver.matter_events WHERE (element_at(attributes, 'synthetic') = 'true' OR source = 'sonoff')) SELECT count_if(event_time >= localtimestamp - INTERVAL '15' MINUTE OR domain IN ('button', 'event', 'update', 'select', 'number')) AS value FROM latest WHERE rn = 1",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 100
+              },
+              {
+                "color": "green",
+                "value": 120
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "orientation": "auto",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Sensores numéricos",
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT count(DISTINCT entity_id) AS value FROM tfm.silver.matter_events WHERE (element_at(attributes, 'synthetic') = 'true' OR source = 'sonoff') AND domain = 'sensor' AND numeric_state IS NOT NULL",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "orientation": "auto",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Actuadores activos",
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "WITH latest AS (SELECT entity_id, state, row_number() OVER (PARTITION BY entity_id ORDER BY event_time DESC, bronze_timestamp DESC) AS rn FROM tfm.silver.matter_events WHERE (element_at(attributes, 'synthetic') = 'true' OR source = 'sonoff') AND domain IN ('light', 'switch', 'binary_sensor', 'lock')) SELECT count_if(lower(state) IN ('on', 'open', 'unlocked', 'active', 'detected')) AS value FROM latest WHERE rn = 1",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 10
+              },
+              {
+                "color": "orange",
+                "value": 25
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "orientation": "auto",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Alertas de estado",
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 16,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "WITH latest AS (SELECT entity_id, domain, state, quality_flag, event_time, row_number() OVER (PARTITION BY entity_id ORDER BY event_time DESC, bronze_timestamp DESC) AS rn FROM tfm.silver.matter_events WHERE (element_at(attributes, 'synthetic') = 'true' OR source = 'sonoff')) SELECT count_if(quality_flag <> 'ok' OR lower(state) IN ('unknown', 'unavailable') OR (domain NOT IN ('button', 'event', 'update', 'select', 'number') AND event_time < localtimestamp - INTERVAL '15' MINUTE)) AS value FROM latest WHERE rn = 1",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "orientation": "auto",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Última actualización",
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT CAST(to_unixtime(max(event_time)) * 1000 AS BIGINT) AS value FROM tfm.silver.matter_events WHERE (element_at(attributes, 'synthetic') = 'true' OR source = 'sonoff')",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeAsIso",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "orientation": "auto",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Estado actual de todas las entidades",
+      "description": "Una fila por entidad activa del inventario, con su KPI más reciente y correspondencia con la entidad Matter real.",
+      "gridPos": {
+        "h": 16,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "WITH latest AS (SELECT *, row_number() OVER (PARTITION BY entity_id ORDER BY event_time DESC, bronze_timestamp DESC) AS rn FROM tfm.silver.matter_events WHERE (element_at(attributes, 'synthetic') = 'true' OR source = 'sonoff')) SELECT CASE WHEN lower(coalesce(friendly_name, entity_id)) LIKE '%borja%' THEN 'Sensor Habitación 3' WHEN lower(coalesce(friendly_name, entity_id)) LIKE '%padres%' THEN 'Sensor Habitación principal' WHEN lower(coalesce(friendly_name, entity_id)) LIKE '%chicas%' THEN 'Sensor Habitación 2' ELSE replace(coalesce(friendly_name, entity_id), '[SYN] ', '') END AS dispositivo, coalesce(element_at(attributes, 'original_entity_id'), entity_id) AS entidad, CASE WHEN lower(coalesce(element_at(attributes, 'area_id'), '')) LIKE '%borja%' THEN 'Habitación 3' WHEN lower(coalesce(element_at(attributes, 'area_id'), '')) LIKE '%padres%' THEN 'Habitación principal' WHEN lower(coalesce(element_at(attributes, 'area_id'), '')) LIKE '%chicas%' THEN 'Habitación 2' ELSE coalesce(element_at(attributes, 'area_id'), 'sin_area') END AS estancia, domain AS tipo, CASE WHEN numeric_state IS NOT NULL THEN concat(format('%.2f', numeric_state), coalesce(concat(' ', unit), '')) WHEN lower(state) = 'on' AND domain = 'binary_sensor' THEN 'Abierta / detectado' WHEN lower(state) = 'off' AND domain = 'binary_sensor' THEN 'Cerrada / normal' WHEN lower(state) = 'on' THEN 'Encendido' WHEN lower(state) = 'off' THEN 'Apagado' WHEN lower(state) = 'unlocked' THEN 'Abierta' WHEN lower(state) = 'locked' THEN 'Cerrada' WHEN domain IN ('button', 'event') THEN 'Evento recibido' ELSE state END AS valor_actual, CASE WHEN domain IN ('button', 'event') THEN 'EVENTO' WHEN quality_flag <> 'ok' THEN upper(quality_flag) WHEN domain IN ('update', 'select', 'number') AND event_time >= localtimestamp - INTERVAL '70' MINUTE THEN 'OK' WHEN event_time >= localtimestamp - INTERVAL '15' MINUTE THEN 'OK' ELSE 'DESACTUALIZADO' END AS estado_dato, event_time AS ultima_actualizacion FROM latest WHERE rn = 1 ORDER BY estancia, tipo, dispositivo",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "estado_dato"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "OK": {
+                        "color": "green",
+                        "index": 0
+                      },
+                      "EVENTO": {
+                        "color": "blue",
+                        "index": 1
+                      },
+                      "DESACTUALIZADO": {
+                        "color": "orange",
+                        "index": 2
+                      },
+                      "UNAVAILABLE": {
+                        "color": "red",
+                        "index": 3
+                      },
+                      "UNKNOWN": {
+                        "color": "red",
+                        "index": 4
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "sortBy": [
+          {
+            "displayName": "estancia",
+            "desc": false
+          }
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "type": "bargauge",
+      "title": "Temperatura actual por sensor",
+      "gridPos": {
+        "h": 11,
+        "w": 12,
+        "x": 0,
+        "y": 21
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "WITH latest AS (SELECT entity_id, friendly_name, numeric_state, event_time, row_number() OVER (PARTITION BY entity_id ORDER BY event_time DESC, bronze_timestamp DESC) AS rn FROM tfm.silver.matter_events WHERE (element_at(attributes, 'synthetic') = 'true' OR source = 'sonoff') AND domain = 'sensor' AND unit = '°C' AND numeric_state IS NOT NULL) SELECT replace(coalesce(friendly_name, entity_id), '[SYN] ', '') AS metric, CAST(numeric_state AS DOUBLE) AS value FROM latest WHERE rn = 1 ORDER BY value DESC",
+          "format": 1
+        }
+      ],
+      "transformations": [
+        {
+          "id": "rowsToFields",
+          "options": {
+            "mappings": [
+              {
+                "fieldName": "metric",
+                "handlerKey": "field.name"
+              },
+              {
+                "fieldName": "value",
+                "handlerKey": "field.value"
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "decimals": 1,
+          "color": {
+            "mode": "continuous-GrYlRd"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      }
+    },
+    {
+      "id": 9,
+      "type": "bargauge",
+      "title": "Humedad actual por sensor",
+      "gridPos": {
+        "h": 11,
+        "w": 12,
+        "x": 12,
+        "y": 21
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "WITH latest AS (SELECT entity_id, friendly_name, numeric_state, event_time, row_number() OVER (PARTITION BY entity_id ORDER BY event_time DESC, bronze_timestamp DESC) AS rn FROM tfm.silver.matter_events WHERE (element_at(attributes, 'synthetic') = 'true' OR source = 'sonoff') AND domain = 'sensor' AND unit = '%' AND numeric_state IS NOT NULL) SELECT replace(coalesce(friendly_name, entity_id), '[SYN] ', '') AS metric, CAST(numeric_state AS DOUBLE) AS value FROM latest WHERE rn = 1 ORDER BY value DESC",
+          "format": 1
+        }
+      ],
+      "transformations": [
+        {
+          "id": "rowsToFields",
+          "options": {
+            "mappings": [
+              {
+                "fieldName": "metric",
+                "handlerKey": "field.name"
+              },
+              {
+                "fieldName": "value",
+                "handlerKey": "field.value"
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "min": 0,
+          "max": 100,
+          "color": {
+            "mode": "continuous-BlYlRd"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      }
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Puertas, cerraduras y sensores de apertura",
+      "gridPos": {
+        "h": 10,
+        "w": 10,
+        "x": 0,
+        "y": 32
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "WITH latest AS (SELECT *, row_number() OVER (PARTITION BY entity_id ORDER BY event_time DESC, bronze_timestamp DESC) AS rn FROM tfm.silver.matter_events WHERE (element_at(attributes, 'synthetic') = 'true' OR source = 'sonoff')) SELECT replace(coalesce(friendly_name, entity_id), '[SYN] ', '') AS dispositivo, coalesce(element_at(attributes, 'area_id'), 'sin_area') AS estancia, CASE WHEN lower(state) IN ('on', 'open', 'unlocked', 'active', 'detected') THEN 'ABIERTA / ACTIVA' WHEN lower(state) IN ('off', 'closed', 'locked', 'inactive', 'clear') THEN 'CERRADA / NORMAL' ELSE upper(state) END AS estado, event_time AS ultima_actualizacion FROM latest WHERE rn = 1 AND (domain = 'lock' OR domain = 'binary_sensor' OR lower(entity_id) LIKE '%puerta%') ORDER BY estancia, dispositivo",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "estado"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "ABIERTA / ACTIVA": {
+                        "color": "orange",
+                        "index": 0
+                      },
+                      "CERRADA / NORMAL": {
+                        "color": "green",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "table",
+      "title": "Luces e interruptores",
+      "gridPos": {
+        "h": 10,
+        "w": 14,
+        "x": 10,
+        "y": 32
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "WITH latest AS (SELECT *, row_number() OVER (PARTITION BY entity_id ORDER BY event_time DESC, bronze_timestamp DESC) AS rn FROM tfm.silver.matter_events WHERE (element_at(attributes, 'synthetic') = 'true' OR source = 'sonoff') AND domain IN ('light', 'switch')) SELECT replace(coalesce(friendly_name, entity_id), '[SYN] ', '') AS dispositivo, coalesce(element_at(attributes, 'area_id'), 'sin_area') AS estancia, CASE WHEN lower(state) = 'on' THEN 'ENCENDIDO' WHEN lower(state) = 'off' THEN 'APAGADO' ELSE upper(state) END AS estado, event_time AS ultima_actualizacion FROM latest WHERE rn = 1 ORDER BY estancia, dispositivo",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "estado"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "ENCENDIDO": {
+                        "color": "yellow",
+                        "index": 0
+                      },
+                      "APAGADO": {
+                        "color": "green",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "table",
+      "title": "Estado actual · Sensores ambientales",
+      "description": "KPI actual de cada sensor ambiental integrado en el flujo completo.",
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 42
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "WITH latest AS (SELECT max(observation_date) AS d FROM tfm.gold.environment_daily), rows AS (SELECT room_name AS estancia, 'Temperatura' AS medida, CAST(indoor_mean_temperature_c AS DOUBLE) AS valor, temperature_event_count AS eventos, CASE WHEN temperature_event_count > 0 THEN 'OK' ELSE 'SIN DATOS' END AS calidad, last_indoor_event_time AS ultima_actualizacion FROM tfm.gold.environment_daily, latest WHERE observation_date = latest.d AND indoor_mean_temperature_c IS NOT NULL UNION ALL SELECT room_name, 'Humedad', CAST(indoor_mean_humidity_pct AS DOUBLE), humidity_event_count, CASE WHEN humidity_event_count > 0 THEN 'OK' ELSE 'SIN DATOS' END, last_indoor_event_time FROM tfm.gold.environment_daily, latest WHERE observation_date = latest.d AND indoor_mean_humidity_pct IS NOT NULL) SELECT * FROM rows ORDER BY estancia, medida",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "estado_dato"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "OK": {
+                        "color": "green",
+                        "index": 0
+                      },
+                      "UNAVAILABLE": {
+                        "color": "red",
+                        "index": 1
+                      },
+                      "UNKNOWN": {
+                        "color": "red",
+                        "index": 2
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "sortBy": [
+          {
+            "displayName": "estancia",
+            "desc": false
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "status": "passed",
+  "checks": [
+    "same_batch_duplicates",
+    "replay_same_offsets",
+    "duplicate_across_batches",
+    "historical_event_updates_original_window",
+    "quarantine_with_explicit_causes_and_replay",
+    "recovery_after_partial_commit_and_null_unit_merge"
+  ],
+  "timestamp": "2026-09-13T15:35:50.613917+00:00"
+}

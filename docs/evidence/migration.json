@@ -1,0 +1,60 @@
+{
+  "timestamp": "2026-09-13T15:34:12.916628+00:00",
+  "baseline_missing_in_iceberg": 0,
+  "raw_payload_mismatches": 0,
+  "counts": {
+    "silver": 9828,
+    "gold_rows": 9813,
+    "gold_events": 9828,
+    "quarantine": 42,
+    "bronze": 9870
+  },
+  "silver_duplicate_ids": 0,
+  "bronze_duplicate_observations": 0,
+  "quarantine_reasons": [
+    {
+      "quality_errors": [
+        "state_unavailable"
+      ],
+      "n": 5
+    },
+    {
+      "quality_errors": [
+        "future_event"
+      ],
+      "n": 37
+    }
+  ],
+  "quarantine_without_reason": 0,
+  "snapshots": {
+    "iot_bronze": [
+      {
+        "committed_at": "2026-09-13 15:28:55.973 UTC",
+        "snapshot_id": 3005247797695631375,
+        "operation": "append"
+      }
+    ],
+    "iot_silver": [
+      {
+        "committed_at": "2026-09-13 15:29:08.558 UTC",
+        "snapshot_id": 558259531679884373,
+        "operation": "append"
+      }
+    ],
+    "iot_gold": [
+      {
+        "committed_at": "2026-09-13 15:29:37.929 UTC",
+        "snapshot_id": 7625401612401554276,
+        "operation": "append"
+      }
+    ],
+    "iot_quality": [
+      {
+        "committed_at": "2026-09-13 15:29:02.611 UTC",
+        "snapshot_id": 884666850294289718,
+        "operation": "append"
+      }
+    ]
+  },
+  "status": "passed"
+}

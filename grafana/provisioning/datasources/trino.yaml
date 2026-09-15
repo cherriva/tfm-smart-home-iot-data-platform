@@ -1,0 +1,11 @@
+apiVersion: 1
+
+datasources:
+  - name: Trino
+    uid: tfm-trino
+    type: trino-datasource
+    access: proxy
+    url: http://trino:8080
+    user: grafana
+    isDefault: true
+    editable: true

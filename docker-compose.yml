@@ -1,0 +1,516 @@
+name: tfm-smart-home
+
+networks:
+  tfm:
+    driver: bridge
+
+volumes:
+  redpanda_data:
+  minio_data:
+  hive_metastore_data:
+  iceberg_metastore_data:
+  grafana_data:
+  synthetic_generator_state:
+  airflow_postgres_data:
+  airflow_home:
+
+services:
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v26.2.2
+    command:
+      - redpanda
+      - start
+      - --kafka-addr
+      - internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr
+      - internal://redpanda:9092,external://localhost:19092
+      - --pandaproxy-addr
+      - internal://0.0.0.0:8082,external://0.0.0.0:18082
+      - --advertise-pandaproxy-addr
+      - internal://redpanda:8082,external://localhost:18082
+      - --schema-registry-addr
+      - internal://0.0.0.0:8081,external://0.0.0.0:18081
+      - --rpc-addr
+      - redpanda:33145
+      - --advertise-rpc-addr
+      - redpanda:33145
+      - --mode
+      - dev-container
+      - --smp
+      - "1"
+      - --default-log-level=info
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+    ports:
+      - "19092:19092"
+      - "18081:18081"
+      - "18082:18082"
+      - "19644:9644"
+    networks:
+      - tfm
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health --api-urls localhost:9644 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  topics-init:
+    image: docker.redpanda.com/redpandadata/redpanda:v26.2.2
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        if rpk topic describe tfm.matter.events --brokers redpanda:9092 >/dev/null 2>&1; then
+          echo "Topic tfm.matter.events ya existe"
+        else
+          rpk topic create tfm.matter.events --brokers redpanda:9092 --partitions 3 --replicas 1
+        fi
+    networks:
+      - tfm
+    restart: "no"
+
+  redpanda-console:
+    image: docker.redpanda.com/redpandadata/console:v3.11.0
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    environment:
+      CONFIG_FILEPATH: /etc/redpanda-console/config.yaml
+    volumes:
+      - ./redpanda-console-config.yaml:/etc/redpanda-console/config.yaml:ro
+    ports:
+      - "8080:8080"
+    networks:
+      - tfm
+    restart: unless-stopped
+
+  mqtt-ingestor:
+    build:
+      context: ./mqtt-ingestor
+    depends_on:
+      topics-init:
+        condition: service_completed_successfully
+    environment:
+      MQTT_HOST: ${MQTT_HOST:-gallodomotica.duckdns.org}
+      MQTT_PORT: ${MQTT_PORT:-8883}
+      MQTT_USERNAME: ${MQTT_USERNAME:-mqtt}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:?Define MQTT_PASSWORD in .env or the shell environment}
+      MQTT_TOPIC: ${MQTT_TOPIC:-tfm/+/events/#}
+      MQTT_TLS: ${MQTT_TLS:-true}
+      MQTT_TLS_INSECURE: ${MQTT_TLS_INSECURE:-false}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-redpanda:9092}
+      KAFKA_TOPIC: ${KAFKA_TOPIC:-tfm.matter.events}
+      MQTT_CLIENT_ID: ${MQTT_CLIENT_ID:-tfm-mqtt-ingestor}
+    networks:
+      - tfm
+    restart: unless-stopped
+
+  synthetic-generator:
+    build:
+      context: ./synthetic-generator
+    depends_on:
+      topics-init:
+        condition: service_completed_successfully
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-redpanda:9092}
+      KAFKA_TOPIC: ${KAFKA_TOPIC:-tfm.matter.events}
+      SYNTHETIC_ENABLED: ${SYNTHETIC_ENABLED:-true}
+      SYNTHETIC_DATASET_ID: ${SYNTHETIC_DATASET_ID:-tfm-demo-v1}
+      SYNTHETIC_ENTITY_PREFIX: ${SYNTHETIC_ENTITY_PREFIX:-synthetic_}
+      SYNTHETIC_SEED: ${SYNTHETIC_SEED:-20260913}
+      SYNTHETIC_BOOTSTRAP_HOURS: ${SYNTHETIC_BOOTSTRAP_HOURS:-24}
+      SYNTHETIC_BOOTSTRAP_STEP_SECONDS: ${SYNTHETIC_BOOTSTRAP_STEP_SECONDS:-900}
+      SYNTHETIC_INTERVAL_SECONDS: ${SYNTHETIC_INTERVAL_SECONDS:-300}
+      SYNTHETIC_INCLUDE_REGISTRY_ONLY: ${SYNTHETIC_INCLUDE_REGISTRY_ONLY:-false}
+      SYNTHETIC_ANOMALIES_ENABLED: ${SYNTHETIC_ANOMALIES_ENABLED:-true}
+      SYNTHETIC_ANOMALY_RATE: ${SYNTHETIC_ANOMALY_RATE:-0.04}
+      SYNTHETIC_INVENTORY_PATH: /data/matter_inventory.csv
+      SYNTHETIC_STATE_DIR: /state
+    volumes:
+      - ./matter_inventory.csv:/data/matter_inventory.csv:ro
+      - synthetic_generator_state:/state
+    networks:
+      - tfm
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-tfm_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-tfm_dev_password_change_me}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - tfm
+    restart: unless-stopped
+
+  minio-init:
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    depends_on:
+      - minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-tfm_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-tfm_dev_password_change_me}
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        until mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" >/dev/null 2>&1; do
+          echo "Esperando a MinIO..."
+          sleep 2
+        done
+        mc mb --ignore-existing local/tfm-bronze
+        mc mb --ignore-existing local/tfm-checkpoints
+        mc mb --ignore-existing local/tfm-silver
+        mc mb --ignore-existing local/tfm-gold
+        mc mb --ignore-existing local/tfm-lakehouse
+        echo "Buckets Bronze preparados"
+    networks:
+      - tfm
+    restart: "no"
+
+  spark-bronze:
+    profiles: ["legacy"]
+    build:
+      context: ./spark-bronze
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-redpanda:9092}
+      KAFKA_TOPIC: ${KAFKA_TOPIC:-tfm.matter.events}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-tfm_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-tfm_dev_password_change_me}
+      BRONZE_PATH: ${BRONZE_PATH:-s3a://tfm-bronze/matter_events}
+      CHECKPOINT_PATH: ${CHECKPOINT_PATH:-s3a://tfm-checkpoints/matter_events}
+    networks:
+      - tfm
+    restart: unless-stopped
+
+  spark-silver-gold:
+    profiles: ["legacy"]
+    build:
+      context: ./spark-bronze
+    command:
+      - /opt/spark/bin/spark-submit
+      - --master
+      - local[2]
+      - --packages
+      - org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262
+      - /opt/spark/jobs/silver_gold_stream.py
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      BRONZE_PATH: ${BRONZE_PATH:-s3a://tfm-bronze/matter_events}
+      SILVER_PATH: ${SILVER_PATH:-s3a://tfm-silver/matter_events}
+      GOLD_PATH: ${GOLD_PATH:-s3a://tfm-gold/entity_5m}
+      SILVER_CHECKPOINT_PATH: ${SILVER_CHECKPOINT_PATH:-s3a://tfm-checkpoints/silver_matter_events}
+      GOLD_CHECKPOINT_PATH: ${GOLD_CHECKPOINT_PATH:-s3a://tfm-checkpoints/gold_entity_5m}
+      SILVER_GOLD_MAX_FILES_PER_TRIGGER: ${SILVER_GOLD_MAX_FILES_PER_TRIGGER:-500}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-tfm_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-tfm_dev_password_change_me}
+    networks:
+      - tfm
+    restart: unless-stopped
+
+  spark-lakehouse:
+    image: tfm-spark-lakehouse:week1
+    build:
+      context: ./spark-lakehouse
+    depends_on:
+      lakehouse-init:
+        condition: service_completed_successfully
+      redpanda:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      iceberg-metastore:
+        condition: service_healthy
+    environment: &lakehouse-env
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-redpanda:9092}
+      KAFKA_TOPIC: ${KAFKA_TOPIC:-tfm.matter.events}
+      KAFKA_LOG_ID: ${KAFKA_LOG_ID:-tfm-log-v1}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-tfm_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-tfm_dev_password_change_me}
+      HIVE_METASTORE_URI: thrift://iceberg-metastore:9083
+      LAKEHOUSE_CHECKPOINT_PATH: ${LAKEHOUSE_CHECKPOINT_PATH:-s3a://tfm-checkpoints/iceberg_v1}
+      LAKEHOUSE_MAX_OFFSETS_PER_TRIGGER: ${LAKEHOUSE_MAX_OFFSETS_PER_TRIGGER:-5000}
+      LAKEHOUSE_TRIGGER_INTERVAL: ${LAKEHOUSE_TRIGGER_INTERVAL:-30 seconds}
+      QUALITY_TEMPERATURE_MIN_C: ${QUALITY_TEMPERATURE_MIN_C:--40}
+      QUALITY_TEMPERATURE_MAX_C: ${QUALITY_TEMPERATURE_MAX_C:-85}
+      QUALITY_FUTURE_TOLERANCE_SECONDS: ${QUALITY_FUTURE_TOLERANCE_SECONDS:-300}
+      QUALITY_LATE_THRESHOLD_SECONDS: ${QUALITY_LATE_THRESHOLD_SECONDS:-86400}
+      QUALITY_INACTIVITY_SECONDS: ${QUALITY_INACTIVITY_SECONDS:-86400}
+      SYNTHETIC_ENTITY_PREFIX: ${SYNTHETIC_ENTITY_PREFIX:-synthetic_}
+      HOMEKIT_SENSOR_ENTITIES: ${HOMEKIT_SENSOR_ENTITIES:-sensor.temperatura_salon,sensor.temperatura_dormitorio_padres,sensor.temperatura_dormitorio_borja,sensor.humedad_salon,sensor.humedad_dormitorio_borja,sensor.humedad_dormitorio_padres}
+    volumes:
+      - ./matter_inventory.csv:/data/matter_inventory.csv:ro
+    networks:
+      - tfm
+    restart: unless-stopped
+
+  lakehouse-init:
+    image: tfm-spark-lakehouse:week1
+    build:
+      context: ./spark-lakehouse
+    environment: *lakehouse-env
+    command: ["/opt/spark/bin/spark-submit", "--master", "local[2]", "/opt/spark/jobs/lakehouse_stream.py", "--init-only"]
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
+      iceberg-metastore:
+        condition: service_healthy
+    volumes:
+      - ./matter_inventory.csv:/data/matter_inventory.csv:ro
+    networks: [tfm]
+    restart: "no"
+
+  iceberg-metastore:
+    image: apache/hive:3.1.3
+    user: "0:0"
+    entrypoint: ["/bin/bash", "/opt/iceberg-entrypoint.sh"]
+    environment:
+      HADOOP_CLASSPATH: /opt/hadoop/share/hadoop/tools/lib/*
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-tfm_admin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-tfm_dev_password_change_me}
+    volumes:
+      - iceberg_metastore_data:/opt/hive/data
+      - ./hive/iceberg-site.xml:/opt/hive/conf/hive-site.xml:ro
+      - ./hive/iceberg-entrypoint.sh:/opt/iceberg-entrypoint.sh:ro
+    networks: [tfm]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/9083'"]
+      interval: 10s
+      timeout: 5s
+      retries: 24
+      start_period: 30s
+
+  hive-metastore:
+    image: apache/hive:4.2.1
+    environment:
+      SERVICE_NAME: metastore
+      HADOOP_CLASSPATH: /opt/hadoop/share/hadoop/tools/lib/*
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-tfm_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-tfm_dev_password_change_me}
+      S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-tfm_admin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-tfm_dev_password_change_me}
+    volumes:
+      - hive_metastore_data:/opt/hive/data
+      - ./hive/hive-site.xml:/opt/hive/conf/hive-site.xml.template:ro
+    networks:
+      - tfm
+    ports:
+      - "9083:9083"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/9083'"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+
+  trino:
+    image: trinodb/trino:483
+    depends_on:
+      hive-metastore:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-tfm_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-tfm_dev_password_change_me}
+    volumes:
+      - ./trino/config.properties:/etc/trino/config.properties:ro
+      - ./trino/jvm.config:/etc/trino/jvm.config:ro
+      - ./trino/node.properties:/etc/trino/node.properties:ro
+      - ./trino/catalog:/etc/trino/catalog:ro
+    ports:
+      - "8081:8080"
+    networks:
+      - tfm
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/8080'"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 45s
+
+  trino-iceberg-init:
+    image: trinodb/trino:483
+    depends_on:
+      trino:
+        condition: service_healthy
+      lakehouse-init:
+        condition: service_completed_successfully
+    volumes:
+      - ./trino/iceberg-views.sql:/etc/iceberg-views.sql:ro
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        until /usr/bin/trino --server http://trino:8080 --user init --execute "SELECT 1" >/dev/null 2>&1; do sleep 2; done
+        /usr/bin/trino --server http://trino:8080 --user init --file /etc/iceberg-views.sql
+    networks: [tfm]
+    restart: "no"
+
+  trino-init:
+    profiles: ["legacy"]
+    image: trinodb/trino:483
+    depends_on:
+      trino:
+        condition: service_healthy
+    volumes:
+      - ./trino/init.sql:/etc/trino-init.sql:ro
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        /usr/bin/trino --server http://trino:8080 --user init --file /etc/trino-init.sql
+        echo "Catálogo Trino inicializado"
+    networks:
+      - tfm
+    restart: "no"
+
+  trino-sync:
+    profiles: ["legacy"]
+    image: trinodb/trino:483
+    depends_on:
+      trino-init:
+        condition: service_completed_successfully
+    environment:
+      TRINO_PARTITION_SYNC_SECONDS: ${TRINO_PARTITION_SYNC_SECONDS:-60}
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        while true; do
+          /usr/bin/trino --server http://trino:8080 --user partition-sync --execute "
+            CALL tfm_legacy.system.sync_partition_metadata('bronze', 'matter_events', 'FULL');
+            CALL tfm_legacy.system.sync_partition_metadata('silver', 'matter_events', 'FULL');
+            CALL tfm_legacy.system.sync_partition_metadata('gold', 'entity_5m', 'FULL');
+          " >/dev/null 2>&1
+          echo "Particiones Bronze/Silver/Gold sincronizadas"
+          sleep "$${TRINO_PARTITION_SYNC_SECONDS}"
+        done
+    networks:
+      - tfm
+    restart: unless-stopped
+    healthcheck:
+      disable: true
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    depends_on:
+      trino:
+        condition: service_healthy
+    environment:
+      GF_PLUGINS_PREINSTALL: trino-datasource@1.1.1
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    networks:
+      - tfm
+    restart: unless-stopped
+
+  airflow-postgres:
+    image: postgres:16.6-alpine
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD:-airflow_local_dev}
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow_postgres_data:/var/lib/postgresql/data
+    networks: [tfm]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  airflow-volume-init:
+    image: tfm-airflow:3.1.7
+    build:
+      context: .
+      dockerfile: airflow/Dockerfile
+    user: "0:0"
+    entrypoint: ["/bin/bash", "-ec"]
+    command: ["chown -R 50000:0 /opt/airflow/state && chmod -R g+rwX /opt/airflow/state"]
+    volumes:
+      - airflow_home:/opt/airflow/state
+    networks: [tfm]
+    restart: "no"
+
+  airflow:
+    build:
+      context: .
+      dockerfile: airflow/Dockerfile
+    image: tfm-airflow:3.1.7
+    command: standalone
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__PARALLELISM: "2"
+      AIRFLOW__API__WORKERS: "1"
+      AIRFLOW__DAG_PROCESSOR__PARSING_PROCESSES: "1"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_DB_PASSWORD:-airflow_local_dev}@airflow-postgres/airflow
+      AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_API_SECRET:-local-development-change-me}
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: admin:admin
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: /opt/airflow/state/simple_auth_passwords.json
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/state/logs
+      AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL: "30"
+      AEMET_API_KEY: ${AEMET_API_KEY:-}
+      AEMET_LAG_DAYS: ${AEMET_LAG_DAYS:-4}
+      AEMET_S3_ENDPOINT: http://minio:9000
+      AEMET_BRONZE_BUCKET: ${AEMET_BRONZE_BUCKET:-tfm-bronze}
+      DATADIS_USERNAME: ${DATADIS_USERNAME:-}
+      DATADIS_PASSWORD: ${DATADIS_PASSWORD:-}
+      DATADIS_LOOKBACK_MONTHS: ${DATADIS_LOOKBACK_MONTHS:-2}
+      DATADIS_REQUEST_DELAY_SECONDS: ${DATADIS_REQUEST_DELAY_SECONDS:-65}
+      DATADIS_BRONZE_BUCKET: ${DATADIS_BRONZE_BUCKET:-tfm-bronze}
+      DATADIS_S3_ENDPOINT: http://minio:9000
+      ANOMALY_MODEL_SEED: ${ANOMALY_MODEL_SEED:-20260914}
+      ANOMALY_CONTAMINATION: ${ANOMALY_CONTAMINATION:-0.05}
+      ANOMALY_TRAINING_DAYS: ${ANOMALY_TRAINING_DAYS:-30}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-tfm_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-tfm_dev_password_change_me}
+    volumes:
+      - airflow_home:/opt/airflow/state
+    ports:
+      - "127.0.0.1:8082:8080"
+    depends_on:
+      airflow-volume-init:
+        condition: service_completed_successfully
+      airflow-postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      lakehouse-init:
+        condition: service_completed_successfully
+      trino:
+        condition: service_healthy
+    networks: [tfm]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://localhost:8080/api/v2/monitor/health >/dev/null && airflow jobs check --job-type SchedulerJob --local >/dev/null"]
+      interval: 30s
+      timeout: 20s
+      retries: 10
+      start_period: 90s

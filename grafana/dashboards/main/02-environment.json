@@ -1,0 +1,592 @@
+{
+  "id": null,
+  "uid": "tfm-environment",
+  "title": "03 - Comfort",
+  "description": "¿La casa mantiene las condiciones deseadas? Temperatura, humedad y cobertura ambiental por estancia.",
+  "tags": [
+    "tfm",
+    "smart-home",
+    "sensors",
+    "environment",
+    "environmental"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 41,
+  "version": 2,
+  "refresh": "30s",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Sensores de temperatura",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT count(DISTINCT coalesce(element_at(attributes, 'original_entity_id'), entity_id)) AS value FROM tfm.silver.matter_events WHERE domain = 'sensor' AND unit = '°C' AND $__timeFilter(event_time)",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "orientation": "auto",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Sensores de humedad",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT count(DISTINCT coalesce(element_at(attributes, 'original_entity_id'), entity_id)) AS value FROM tfm.silver.matter_events WHERE domain = 'sensor' AND unit = '%' AND $__timeFilter(event_time)",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "orientation": "auto",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Lecturas numéricas",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT count(*) AS value FROM tfm.silver.matter_events WHERE domain = 'sensor' AND numeric_state IS NOT NULL AND $__timeFilter(event_time)",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "orientation": "auto",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Última lectura ambiental",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT CAST(to_unixtime(max(event_time)) * 1000 AS BIGINT) AS value FROM tfm.silver.matter_events WHERE domain = 'sensor' AND numeric_state IS NOT NULL",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeAsIso"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "orientation": "auto",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Temperatura por entidad",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT CAST(observation_date AS timestamp) AS time, room_name AS metric, indoor_mean_temperature_c AS value FROM tfm.gold.environment_daily WHERE indoor_mean_temperature_c IS NOT NULL AND $__timeFilter(observation_date) ORDER BY 1, 2",
+          "format": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Humedad por entidad",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT CAST(observation_date AS timestamp) AS time, room_name AS metric, indoor_mean_humidity_pct AS value FROM tfm.gold.environment_daily WHERE indoor_mean_humidity_pct IS NOT NULL AND $__timeFilter(observation_date) ORDER BY 1, 2",
+          "format": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Resumen estadístico por sensor",
+      "gridPos": {
+        "h": 9,
+        "w": 14,
+        "x": 0,
+        "y": 14
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT room_name AS estancia, round(avg(indoor_mean_temperature_c), 2) AS temperatura_media, round(avg(indoor_mean_humidity_pct), 2) AS humedad_media, sum(indoor_event_count) AS eventos, max(last_indoor_event_time) AS ultima_lectura FROM tfm.gold.environment_daily WHERE $__timeFilter(observation_date) GROUP BY room_name ORDER BY estancia",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "bargauge",
+      "title": "Lecturas por sensor",
+      "gridPos": {
+        "h": 9,
+        "w": 10,
+        "x": 14,
+        "y": 14
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT coalesce(element_at(attributes, 'original_entity_id'), entity_id) AS metric, CAST(count(*) AS DOUBLE) AS value FROM tfm.silver.matter_events WHERE domain = 'sensor' AND numeric_state IS NOT NULL AND $__timeFilter(event_time) GROUP BY 1 ORDER BY value DESC LIMIT 20",
+          "format": 1
+        }
+      ],
+      "transformations": [
+        {
+          "id": "rowsToFields",
+          "options": {
+            "mappings": [
+              {
+                "fieldName": "metric",
+                "handlerKey": "field.name"
+              },
+              {
+                "fieldName": "value",
+                "handlerKey": "field.value"
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "continuous-BlYlRd"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      }
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Último valor conocido por sensor",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "WITH latest AS (SELECT coalesce(element_at(attributes, 'original_entity_id'), entity_id) AS entity_id, replace(coalesce(friendly_name, entity_id), '[SYN] ', '') AS friendly_name, numeric_state AS value, unit, quality_flag AS quality, event_time AS last_event, row_number() OVER (PARTITION BY coalesce(element_at(attributes, 'original_entity_id'), entity_id) ORDER BY event_time DESC, bronze_timestamp DESC) AS rn FROM tfm.silver.matter_events WHERE domain = 'sensor') SELECT entity_id, friendly_name, value, unit, quality, last_event FROM latest WHERE rn = 1 ORDER BY last_event DESC",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "bargauge",
+      "title": "Temperatura actual del hogar",
+      "description": "Último valor recibido de los sensores principales de temperatura.",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 33
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT room_name AS metric, CAST(indoor_mean_temperature_c AS DOUBLE) AS value FROM tfm.gold.environment_daily WHERE observation_date = (SELECT max(observation_date) FROM tfm.gold.environment_daily) AND indoor_mean_temperature_c IS NOT NULL ORDER BY metric",
+          "format": 1
+        }
+      ],
+      "transformations": [
+        {
+          "id": "rowsToFields",
+          "options": {
+            "mappings": [
+              {
+                "fieldName": "metric",
+                "handlerKey": "field.name"
+              },
+              {
+                "fieldName": "value",
+                "handlerKey": "field.value"
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "decimals": 1,
+          "min": 10,
+          "max": 35,
+          "color": {
+            "mode": "continuous-GrYlRd"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      }
+    },
+    {
+      "id": 11,
+      "type": "bargauge",
+      "title": "Humedad actual del hogar",
+      "description": "Último valor recibido de los sensores principales de humedad.",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 33
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT room_name AS metric, CAST(indoor_mean_humidity_pct AS DOUBLE) AS value FROM tfm.gold.environment_daily WHERE observation_date = (SELECT max(observation_date) FROM tfm.gold.environment_daily) AND indoor_mean_humidity_pct IS NOT NULL ORDER BY metric",
+          "format": 1
+        }
+      ],
+      "transformations": [
+        {
+          "id": "rowsToFields",
+          "options": {
+            "mappings": [
+              {
+                "fieldName": "metric",
+                "handlerKey": "field.name"
+              },
+              {
+                "fieldName": "value",
+                "handlerKey": "field.value"
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "min": 0,
+          "max": 100,
+          "color": {
+            "mode": "continuous-BlYlRd"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      }
+    },
+    {
+      "id": 12,
+      "type": "table",
+      "title": "Estado de los sensores ambientales",
+      "description": "Una fila por sensor ambiental principal integrado en la canalización.",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 42
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "WITH latest AS (SELECT max(observation_date) AS d FROM tfm.gold.environment_daily) SELECT room_name AS estancia, 'Temperatura' AS medida, CAST(indoor_mean_temperature_c AS DOUBLE) AS valor, CAST(temperature_event_count AS BIGINT) AS eventos, CASE WHEN temperature_event_count > 0 THEN 'OK' ELSE 'SIN DATOS' END AS calidad, last_indoor_event_time AS ultima_actualizacion FROM tfm.gold.environment_daily CROSS JOIN latest WHERE observation_date = latest.d AND indoor_mean_temperature_c IS NOT NULL UNION ALL SELECT room_name AS estancia, 'Humedad' AS medida, CAST(indoor_mean_humidity_pct AS DOUBLE) AS valor, CAST(humidity_event_count AS BIGINT) AS eventos, CASE WHEN humidity_event_count > 0 THEN 'OK' ELSE 'SIN DATOS' END AS calidad, last_indoor_event_time AS ultima_actualizacion FROM tfm.gold.environment_daily CROSS JOIN latest WHERE observation_date = latest.d AND indoor_mean_humidity_pct IS NOT NULL ORDER BY estancia, medida",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "calidad"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "ok": {
+                        "color": "green",
+                        "index": 0
+                      },
+                      "unavailable": {
+                        "color": "red",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    }
+  ]
+}
