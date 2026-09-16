@@ -200,6 +200,36 @@ Para validar la configuración antes de arrancar:
 docker compose config --quiet
 ```
 
+### Tests automatizados
+
+La suite local valida el contrato de eventos y sus reglas de calidad, las
+transformaciones batch de AEMET y Datadis, los dashboards de Grafana, la
+normalización MQTT, la reproducibilidad del generador sintético y la configuración
+de Docker Compose. No necesita levantar toda la plataforma para ejecutarse:
+
+```bash
+.venv/bin/python -m unittest discover -s tests -v
+```
+
+Actualmente incluye 45 pruebas. También comprueba que no se reintroduzcan
+integraciones o configuraciones retiradas y que los dashboards sólo consulten la
+capa Gold.
+
+Como validación de integración completa, el smoke test recorre el flujo real de
+mensajería y lakehouse: publica un evento, comprueba Bronze, Silver, cuarentena y
+Gold, reinicia Spark, repite el evento para verificar la idempotencia y consulta
+los dashboards a través de Grafana:
+
+```bash
+.venv/bin/python scripts/smoke_test.py --transport kafka --restart
+```
+
+La variante MQTT utiliza el broker TLS configurado en `.env`:
+
+```bash
+.venv/bin/python scripts/smoke_test.py --restart
+```
+
 ## Parada
 
 ```bash

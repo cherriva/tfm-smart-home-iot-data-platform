@@ -35,6 +35,24 @@ class SyntheticGeneratorTests(unittest.TestCase):
         if "SYNTHETIC_BOOTSTRAP_HOURS" not in os.environ:
             self.assertEqual(synthetic_generator.BOOTSTRAP_HOURS, 24 * 40)
 
+    def test_generated_event_is_matter_compatible_and_reproducible(self):
+        row = {
+            "entity_id": "sensor.temperature_test",
+            "domain": "sensor",
+            "device_class": "temperature",
+            "unit_of_measurement": "°C",
+            "current_state": "23",
+            "area_id": "test_room",
+            "device_name": "Test temperature",
+        }
+        timestamp = synthetic_generator.datetime(2026, 9, 16, tzinfo=synthetic_generator.timezone.utc)
+        _, first = synthetic_generator.build_event(row, timestamp)
+        _, second = synthetic_generator.build_event(row, timestamp)
+        self.assertEqual(first, second)
+        self.assertEqual(first["source"], "synthetic")
+        self.assertEqual(first["entity_id"], "sensor.synthetic_temperature_test")
+        self.assertNotIn("is_anomaly_expected", first["attributes"])
+
 
 if __name__ == "__main__":
     unittest.main()

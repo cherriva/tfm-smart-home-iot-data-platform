@@ -11,7 +11,7 @@
   "panels": [
     {
       "id": 1,
-      "type": "stat",
+      "type": "table",
       "title": "Vehículo presente",
       "gridPos": {
         "h": 4,
@@ -26,7 +26,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT state value FROM tfm.iot_gold.garage_events WHERE event_type IN ('vehicle_arrival','vehicle_departure') ORDER BY event_time DESC LIMIT 1",
+          "rawSQL": "SELECT state AS estado, event_time AS ultima_actualizacion FROM tfm.iot_gold.garage_events WHERE event_type IN ('vehicle_arrival','vehicle_departure') ORDER BY event_time DESC LIMIT 1",
           "format": 1
         }
       ],
@@ -37,7 +37,7 @@
     },
     {
       "id": 2,
-      "type": "stat",
+      "type": "table",
       "title": "Puerta del garaje",
       "gridPos": {
         "h": 4,
@@ -52,7 +52,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT state value FROM tfm.iot_gold.garage_events WHERE entity_id LIKE '%door%' OR entity_id LIKE '%puerta%' ORDER BY event_time DESC LIMIT 1",
+          "rawSQL": "SELECT state AS estado, event_time AS ultima_actualizacion FROM tfm.iot_gold.garage_events WHERE entity_id LIKE '%door%' OR entity_id LIKE '%puerta%' ORDER BY event_time DESC LIMIT 1",
           "format": 1
         }
       ],
@@ -106,7 +106,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT sum(duration_minutes) value FROM tfm.iot_gold.garage_events WHERE $__timeFilter(event_time)",
+          "rawSQL": "SELECT coalesce(CAST(sum(duration_minutes) AS double), 0.0) AS value FROM tfm.iot_gold.garage_events WHERE $__timeFilter(event_time)",
           "format": 1
         }
       ],
@@ -145,7 +145,7 @@
     },
     {
       "id": 6,
-      "type": "barchart",
+      "type": "timeseries",
       "title": "Llegadas y salidas",
       "gridPos": {
         "h": 8,
@@ -160,8 +160,8 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT CAST(event_time AS date) day, count_if(event_type='vehicle_arrival') arrivals, count_if(event_type='vehicle_departure') departures FROM tfm.iot_gold.garage_events WHERE $__timeFilter(event_time) GROUP BY 1 ORDER BY 1",
-          "format": 1
+          "rawSQL": "SELECT CAST(CAST(event_time AS date) AS timestamp) AS time, count_if(event_type='vehicle_arrival') AS arrivals, count_if(event_type='vehicle_departure') AS departures FROM tfm.iot_gold.garage_events WHERE $__timeFilter(event_time) GROUP BY 1 ORDER BY 1",
+          "format": 0
         }
       ],
       "fieldConfig": {
@@ -188,7 +188,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT time, room metric, temperature_c value FROM tfm.iot_gold.comfort_hourly WHERE room='garaje' AND $__timeFilter(time) ORDER BY time",
+          "rawSQL": "SELECT time, room metric, temperature_c value FROM tfm.iot_gold.comfort_hourly WHERE room='garaje' AND temperature_c BETWEEN -40 AND 35 AND $__timeFilter(time) ORDER BY time",
           "format": 0
         }
       ],

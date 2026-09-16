@@ -207,7 +207,7 @@
     },
     {
       "id": 8,
-      "type": "barchart",
+      "type": "table",
       "title": "Frescura del dato",
       "gridPos": {
         "h": 8,

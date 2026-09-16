@@ -429,7 +429,7 @@
     },
     {
       "id": 16,
-      "type": "barchart",
+      "type": "table",
       "title": "Frescura por sensor",
       "gridPos": {
         "h": 8,

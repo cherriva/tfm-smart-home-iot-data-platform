@@ -261,7 +261,7 @@
     },
     {
       "id": 10,
-      "type": "barchart",
+      "type": "timeseries",
       "title": "Consumo diario",
       "gridPos": {
         "h": 8,
@@ -276,8 +276,8 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT day, coalesce(max(grid_energy_kwh),sum(estimated_energy_kwh)) energy_kwh FROM tfm.iot_gold.energy_daily WHERE $__timeFilter(CAST(day AS timestamp)) GROUP BY day ORDER BY day",
-          "format": 1
+          "rawSQL": "SELECT CAST(day AS timestamp) AS time, coalesce(max(grid_energy_kwh),sum(estimated_energy_kwh)) AS energy_kwh FROM tfm.iot_gold.energy_daily WHERE $__timeFilter(CAST(day AS timestamp)) GROUP BY day ORDER BY day",
+          "format": 0
         }
       ],
       "fieldConfig": {

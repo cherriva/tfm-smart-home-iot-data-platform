@@ -177,7 +177,7 @@
     },
     {
       "id": 7,
-      "type": "barchart",
+      "type": "timeseries",
       "title": "Consumo de agua diario",
       "gridPos": {
         "h": 8,
@@ -192,8 +192,8 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT day, room, CAST(water_liters AS double) AS water_liters FROM tfm.iot_gold.water_daily WHERE $__timeFilter(CAST(day AS timestamp)) ORDER BY day,room",
-          "format": 1
+          "rawSQL": "SELECT CAST(day AS timestamp) AS time, room AS metric, CAST(water_liters AS double) AS value FROM tfm.iot_gold.water_daily WHERE $__timeFilter(CAST(day AS timestamp)) ORDER BY 1,2",
+          "format": 0
         }
       ],
       "fieldConfig": {

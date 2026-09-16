@@ -123,7 +123,7 @@
     },
     {
       "id": 5,
-      "type": "barchart",
+      "type": "table",
       "title": "Aperturas por acceso",
       "gridPos": {
         "h": 8,
@@ -177,7 +177,7 @@
     },
     {
       "id": 7,
-      "type": "barchart",
+      "type": "table",
       "title": "Duración abierta",
       "gridPos": {
         "h": 8,
