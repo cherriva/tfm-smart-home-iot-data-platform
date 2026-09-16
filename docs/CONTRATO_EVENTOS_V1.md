@@ -28,7 +28,7 @@ de las tablas se interpretan en UTC con precisión de microsegundos.
 
 `schema_version` omitida equivale a 1 para admitir los eventos existentes. Se exige
 un objeto JSON. Los campos obligatorios son `source`, `entity_id`, `domain`, `state`
-y `event_timestamp`. Source admite `matter`, `homekit`, `synthetic`. Dominio y prefijo
+y `event_timestamp`. Source admite `matter` y `synthetic`. Dominio y prefijo
 de entidad deben coincidir. Se aceptan estados textuales y números JSON finitos;
 los atributos son un objeto JSON y pueden contener estructuras anidadas.
 

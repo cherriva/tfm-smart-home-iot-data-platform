@@ -103,7 +103,7 @@ def normalize(raw_value, broker_time, config=None):
         errors.append("invalid_attributes")
         attrs = {}
 
-    if source not in {"matter", "homekit", "synthetic", "sonoff"}:
+    if source not in {"matter", "synthetic"}:
         errors.append("missing_source" if source is None else "invalid_source")
     if not entity:
         errors.append("missing_entity")

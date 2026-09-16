@@ -55,18 +55,6 @@ BOOTSTRAP_STEP_SECONDS = env_int("SYNTHETIC_BOOTSTRAP_STEP_SECONDS", 900, 60)
 INTERVAL_SECONDS = env_int("SYNTHETIC_INTERVAL_SECONDS", 300, 30)
 ENABLED = env_bool("SYNTHETIC_ENABLED", True)
 INCLUDE_REGISTRY_ONLY = env_bool("SYNTHETIC_INCLUDE_REGISTRY_ONLY", False)
-ANOMALIES_ENABLED = env_bool("SYNTHETIC_ANOMALIES_ENABLED", True)
-
-
-def env_float(name: str, default: float, minimum: float = 0.0, maximum: float = 1.0) -> float:
-    try:
-        value = float(os.getenv(name, str(default)))
-    except ValueError as exc:
-        raise ValueError(f"{name} debe ser un número") from exc
-    return min(maximum, max(minimum, value))
-
-
-ANOMALY_RATE = env_float("SYNTHETIC_ANOMALY_RATE", 0.04)
 
 RUNNING = True
 
@@ -338,32 +326,6 @@ def should_emit(row: dict[str, str], timestamp: datetime, force: bool) -> bool:
     return True
 
 
-def inject_anomaly(row: dict[str, str], timestamp: datetime, state: str) -> tuple[str, str | None]:
-    """Return a deterministic labelled perturbation; real sources never enter here."""
-    if not ANOMALIES_ENABLED:
-        return state, None
-    rng = stable_random("anomaly", row["entity_id"], iso_timestamp(timestamp))
-    if rng.random() >= ANOMALY_RATE:
-        return state, None
-    hint = f"{row.get('device_name', '')} {row.get('entity_id', '')}".lower()
-    domain, device_class = row.get("domain"), row.get("device_class")
-    hour = timestamp.hour
-    if domain == "sensor" and (device_class == "temperature" or row.get("unit_of_measurement") == "°C"):
-        return format_number(rng.choice([-8.0, 52.0]) + rng.uniform(-1, 1)), "temperature_out_of_range"
-    if domain == "sensor" and device_class == "humidity":
-        return format_number(rng.choice([-12.0, 118.0]) + rng.uniform(-2, 2)), "humidity_out_of_range"
-    if "calefaccion" in hint and domain in {"sensor", "switch", "binary_sensor"}:
-        return ("on" if domain != "sensor" else format_number(rng.uniform(0, 10))), "inefficient_heating"
-    if ("lampara" in hint or "luz" in hint) and domain in {"light", "switch"} and 2 <= hour <= 5:
-        return "on", "unusual_light_schedule"
-    if domain == "sensor":
-        try:
-            return format_number(float(state) + rng.choice([-18.0, 18.0])), "abrupt_change"
-        except ValueError:
-            pass
-    return state, None
-
-
 def build_event(row: dict[str, str], timestamp: datetime) -> tuple[str, dict[str, Any]]:
     original_entity_id = row["entity_id"]
     entity_id = synthetic_entity_id(original_entity_id, row.get("domain"))
@@ -382,13 +344,7 @@ def build_event(row: dict[str, str], timestamp: datetime) -> tuple[str, dict[str
         attributes["event_type"] = row.get("event_type") or "initial_press"
         attributes["newPosition"] = str(latency_rng.choice([1, 2]))
 
-    state, anomaly_type = inject_anomaly(row, timestamp, synthetic_state(row, timestamp))
-    if anomaly_type:
-        attributes["is_anomaly_expected"] = "true"
-        attributes["expected_anomaly_type"] = anomaly_type
-        attributes["anomaly_generation_version"] = "week3-v1"
-    else:
-        attributes["is_anomaly_expected"] = "false"
+    state = synthetic_state(row, timestamp)
 
     record = {
         "source": "synthetic",

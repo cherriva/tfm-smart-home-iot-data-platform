@@ -11,7 +11,7 @@ NOW = datetime(2026, 9, 13, 12, tzinfo=timezone.utc)
 
 
 def event(**changes):
-    payload = dict(source="homekit", entity_id="sensor.test_temperature", domain="sensor", state="23.4",
+    payload = dict(source="matter", entity_id="sensor.test_temperature", domain="sensor", state="23.4",
                    event_timestamp=NOW.isoformat(), updated_timestamp=NOW.isoformat(),
                    ingestion_timestamp=NOW.isoformat(),
                    attributes={"device_class": "temperature", "unit_of_measurement": "°C"})
@@ -117,7 +117,7 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(one["event_id"], two["event_id"])
 
     def test_real_changes_different_identity(self):
-        for changed in [event(source="matter"), event(state="25"),
+        for changed in [event(source="synthetic"), event(state="25"),
                         event(updated_timestamp=(NOW + timedelta(seconds=1)).isoformat()),
                         event(attributes={"device_class": "temperature", "unit_of_measurement": "°C", "new": 1})]:
             self.assertNotEqual(check()["event_id"], check(changed)["event_id"])

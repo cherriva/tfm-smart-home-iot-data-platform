@@ -1,0 +1,13 @@
+device_id,device_name,manufacturer,model,sw_version,area_id,via_device_id,entity_id,entity_name,domain,entity_status,current_state,unit_of_measurement,device_class,state_class,event_type,attribute_keys,attributes_json,last_changed,last_reported,last_updated,inventory_note
+real_temp_salon,Matter temperatura salon,Matter,real,1,salon,,temperatura_salon,temperatura_salon,sensor,active,23,°C,temperature,measurement,,,,,,real Matter
+real_temp_d1,Matter temperatura dormitorio1,Matter,real,1,dormitorio1,,temperatura_dormitorio1,temperatura_dormitorio1,sensor,active,23,°C,temperature,measurement,,,,,,real Matter
+real_temp_d3,Matter temperatura dormitorio3,Matter,real,1,dormitorio3,,temperatura_dormitorio3,temperatura_dormitorio3,sensor,active,23,°C,temperature,measurement,,,,,,real Matter
+real_hum_salon,Matter humedad salon,Matter,real,1,salon,,humedad_salon,humedad_salon,sensor,active,50,%,humidity,measurement,,,,,,real Matter
+real_hum_d1,Matter humedad dormitorio1,Matter,real,1,dormitorio1,,humedad_dormitorio1,humedad_dormitorio1,sensor,active,50,%,humidity,measurement,,,,,,real Matter
+real_hum_d2,Matter humedad dormitorio2,Matter,real,1,dormitorio2,,humedad_dormitorio2,humedad_dormitorio2,sensor,active,50,%,humidity,measurement,,,,,,real Matter
+real_door_garage,Matter puerta garaje,Matter,real,1,garaje,,puerta_garaje,puerta_garaje,binary_sensor,active,off,,,door,,,,,,real Matter
+real_door_hall,Matter puerta hall,Matter,real,1,hall,,puerta_hall,puerta_hall,binary_sensor,active,off,,,door,,,,,,real Matter
+real_temp_b1,Matter temperatura bano1,Matter,real,1,bano1,,temperatura_bano1,temperatura_bano1,sensor,active,23,°C,temperature,measurement,,,,,,real Matter
+real_hum_b1,Matter humedad bano1,Matter,real,1,bano1,,humedad_bano1,humedad_bano1,sensor,active,50,%,humidity,measurement,,,,,,real Matter
+real_temp_b2,Matter temperatura bano2,Matter,real,1,bano2,,temperatura_bano2,temperatura_bano2,sensor,active,23,°C,temperature,measurement,,,,,,real Matter
+real_hum_b2,Matter humedad bano2,Matter,real,1,bano2,,humedad_bano2,humedad_bano2,sensor,active,50,%,humidity,measurement,,,,,,real Matter

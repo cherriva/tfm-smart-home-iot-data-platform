@@ -1,6 +1,6 @@
 # Ingesta batch AEMET y Airflow
 
-Canalización batch de semana 2: climatología diaria de AEMET a Bronze, Silver Iceberg y Gold ambiental diaria. AEMET es la fuente de los datos y debe citarse al reutilizarlos. No incluye todavía meteorología horaria.
+Canalización batch de climatología diaria de AEMET a Bronze, Silver Iceberg y Gold ambiental diaria. AEMET es la fuente de los datos y debe citarse al reutilizarlos. No incluye todavía meteorología horaria.
 
 ## Arranque
 

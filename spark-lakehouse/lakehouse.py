@@ -21,7 +21,6 @@ GOLD = "lake.iot_gold.entity_5m"
 INVENTORY = "lake.iot_quality.sensor_inventory"
 AEMET_DAILY = "lake.iot_silver.aemet_daily"
 DATADIS_CONSUMPTION = "lake.iot_silver.datadis_consumption_hourly"
-ANOMALY_EVENTS = "lake.iot_gold.anomaly_events"
 ROOM_LATEST = "lake.iot_gold.room_latest_state"
 ROOM_HOURLY = "lake.iot_gold.room_hourly"
 
@@ -106,17 +105,6 @@ def initialize(spark):
         generation_energy_kwh double, self_consumption_energy_kwh double,
         loaded_at timestamp
     ) USING iceberg PARTITIONED BY (months(reading_date))
-      TBLPROPERTIES ('format-version'='2', 'write.format.default'='parquet',
-                     'write.parquet.compression-codec'='zstd')""")
-    spark.sql(f"""CREATE TABLE IF NOT EXISTS {ANOMALY_EVENTS} (
-        event_id string, source string, entity_id string, event_time timestamp,
-        anomaly_type string, detection_method string, severity string,
-        anomaly_score double, threshold double, explanation string,
-        model_version string, dataset_version string, is_anomaly_expected boolean,
-        expected_anomaly_type string, rule_detected boolean, model_detected boolean,
-        combined_detected boolean, feature_value double, feature_delta double,
-        hour_of_day integer, scored_at timestamp
-    ) USING iceberg PARTITIONED BY (days(event_time))
       TBLPROPERTIES ('format-version'='2', 'write.format.default'='parquet',
                      'write.parquet.compression-codec'='zstd')""")
 
@@ -222,9 +210,6 @@ def load_inventory(spark, config):
                 suffix = row["entity_id"].split(".", 1)[1] if "." in row["entity_id"] else row["entity_id"]
                 rows.append(("synthetic", "sensor." + prefix + suffix,
                                  "sensor", row.get("area_id") or None, config.inactivity_seconds))
-    for entity in os.getenv("HOMEKIT_SENSOR_ENTITIES", "").split(","):
-        if entity.strip():
-            rows.append(("homekit", entity.strip(), "sensor", None, config.inactivity_seconds))
     if rows:
         frame = spark.createDataFrame(rows, "source string, entity_id string, domain string, area_id string, inactivity_seconds long")
         frame.dropDuplicates(["source", "entity_id"]).createOrReplaceTempView("incoming_inventory")

@@ -126,8 +126,6 @@ services:
       SYNTHETIC_BOOTSTRAP_STEP_SECONDS: ${SYNTHETIC_BOOTSTRAP_STEP_SECONDS:-900}
       SYNTHETIC_INTERVAL_SECONDS: ${SYNTHETIC_INTERVAL_SECONDS:-300}
       SYNTHETIC_INCLUDE_REGISTRY_ONLY: ${SYNTHETIC_INCLUDE_REGISTRY_ONLY:-false}
-      SYNTHETIC_ANOMALIES_ENABLED: ${SYNTHETIC_ANOMALIES_ENABLED:-true}
-      SYNTHETIC_ANOMALY_RATE: ${SYNTHETIC_ANOMALY_RATE:-0.04}
       SYNTHETIC_INVENTORY_PATH: /data/matter_inventory.csv
       SYNTHETIC_STATE_DIR: /state
     volumes:
@@ -176,55 +174,6 @@ services:
       - tfm
     restart: "no"
 
-  spark-bronze:
-    profiles: ["legacy"]
-    build:
-      context: ./spark-bronze
-    depends_on:
-      redpanda:
-        condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
-    environment:
-      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-redpanda:9092}
-      KAFKA_TOPIC: ${KAFKA_TOPIC:-tfm.matter.events}
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-tfm_admin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-tfm_dev_password_change_me}
-      BRONZE_PATH: ${BRONZE_PATH:-s3a://tfm-bronze/matter_events}
-      CHECKPOINT_PATH: ${CHECKPOINT_PATH:-s3a://tfm-checkpoints/matter_events}
-    networks:
-      - tfm
-    restart: unless-stopped
-
-  spark-silver-gold:
-    profiles: ["legacy"]
-    build:
-      context: ./spark-bronze
-    command:
-      - /opt/spark/bin/spark-submit
-      - --master
-      - local[2]
-      - --packages
-      - org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262
-      - /opt/spark/jobs/silver_gold_stream.py
-    depends_on:
-      minio-init:
-        condition: service_completed_successfully
-    environment:
-      BRONZE_PATH: ${BRONZE_PATH:-s3a://tfm-bronze/matter_events}
-      SILVER_PATH: ${SILVER_PATH:-s3a://tfm-silver/matter_events}
-      GOLD_PATH: ${GOLD_PATH:-s3a://tfm-gold/entity_5m}
-      SILVER_CHECKPOINT_PATH: ${SILVER_CHECKPOINT_PATH:-s3a://tfm-checkpoints/silver_matter_events}
-      GOLD_CHECKPOINT_PATH: ${GOLD_CHECKPOINT_PATH:-s3a://tfm-checkpoints/gold_entity_5m}
-      SILVER_GOLD_MAX_FILES_PER_TRIGGER: ${SILVER_GOLD_MAX_FILES_PER_TRIGGER:-500}
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-tfm_admin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-tfm_dev_password_change_me}
-    networks:
-      - tfm
-    restart: unless-stopped
-
   spark-lakehouse:
     image: tfm-spark-lakehouse:week1
     build:
@@ -255,7 +204,6 @@ services:
       QUALITY_LATE_THRESHOLD_SECONDS: ${QUALITY_LATE_THRESHOLD_SECONDS:-86400}
       QUALITY_INACTIVITY_SECONDS: ${QUALITY_INACTIVITY_SECONDS:-86400}
       SYNTHETIC_ENTITY_PREFIX: ${SYNTHETIC_ENTITY_PREFIX:-synthetic_}
-      HOMEKIT_SENSOR_ENTITIES: ${HOMEKIT_SENSOR_ENTITIES:-sensor.temperatura_salon,sensor.temperatura_dormitorio_padres,sensor.temperatura_dormitorio_borja,sensor.humedad_salon,sensor.humedad_dormitorio_borja,sensor.humedad_dormitorio_padres}
     volumes:
       - ./matter_inventory.csv:/data/matter_inventory.csv:ro
     networks:
@@ -367,49 +315,6 @@ services:
     networks: [tfm]
     restart: "no"
 
-  trino-init:
-    profiles: ["legacy"]
-    image: trinodb/trino:483
-    depends_on:
-      trino:
-        condition: service_healthy
-    volumes:
-      - ./trino/init.sql:/etc/trino-init.sql:ro
-    entrypoint: ["/bin/sh", "-ec"]
-    command:
-      - |
-        /usr/bin/trino --server http://trino:8080 --user init --file /etc/trino-init.sql
-        echo "Catálogo Trino inicializado"
-    networks:
-      - tfm
-    restart: "no"
-
-  trino-sync:
-    profiles: ["legacy"]
-    image: trinodb/trino:483
-    depends_on:
-      trino-init:
-        condition: service_completed_successfully
-    environment:
-      TRINO_PARTITION_SYNC_SECONDS: ${TRINO_PARTITION_SYNC_SECONDS:-60}
-    entrypoint: ["/bin/sh", "-ec"]
-    command:
-      - |
-        while true; do
-          /usr/bin/trino --server http://trino:8080 --user partition-sync --execute "
-            CALL tfm_legacy.system.sync_partition_metadata('bronze', 'matter_events', 'FULL');
-            CALL tfm_legacy.system.sync_partition_metadata('silver', 'matter_events', 'FULL');
-            CALL tfm_legacy.system.sync_partition_metadata('gold', 'entity_5m', 'FULL');
-          " >/dev/null 2>&1
-          echo "Particiones Bronze/Silver/Gold sincronizadas"
-          sleep "$${TRINO_PARTITION_SYNC_SECONDS}"
-        done
-    networks:
-      - tfm
-    restart: unless-stopped
-    healthcheck:
-      disable: true
-
   grafana:
     image: grafana/grafana:12.1.0
     depends_on:
@@ -484,9 +389,6 @@ services:
       DATADIS_REQUEST_DELAY_SECONDS: ${DATADIS_REQUEST_DELAY_SECONDS:-65}
       DATADIS_BRONZE_BUCKET: ${DATADIS_BRONZE_BUCKET:-tfm-bronze}
       DATADIS_S3_ENDPOINT: http://minio:9000
-      ANOMALY_MODEL_SEED: ${ANOMALY_MODEL_SEED:-20260914}
-      ANOMALY_CONTAMINATION: ${ANOMALY_CONTAMINATION:-0.05}
-      ANOMALY_TRAINING_DAYS: ${ANOMALY_TRAINING_DAYS:-30}
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-tfm_admin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-tfm_dev_password_change_me}
     volumes:

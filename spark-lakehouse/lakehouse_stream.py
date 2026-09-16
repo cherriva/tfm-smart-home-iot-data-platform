@@ -11,7 +11,6 @@ from lakehouse import initialize, load_inventory, process_batch, session
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--bootstrap-parquet", action="store_true")
     parser.add_argument("--init-only", action="store_true")
     parser.add_argument("--available-now", action="store_true")
     args = parser.parse_args()
@@ -19,12 +18,6 @@ def main():
     config = QualityConfig.from_env()
     initialize(spark)
     load_inventory(spark, config)
-    if args.bootstrap_parquet:
-        path = os.getenv("LEGACY_BRONZE_PATH", "s3a://tfm-bronze/matter_events")
-        raw = spark.read.parquet(path)
-        process_batch(spark, raw, -1, config)
-        spark.stop()
-        return
     if args.init_only:
         spark.stop()
         return

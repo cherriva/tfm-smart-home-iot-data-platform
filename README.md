@@ -2,22 +2,21 @@
 
 Plataforma local de datos IoT para recoger telemetría de un hogar, validarla,
 almacenarla en un lakehouse Iceberg y convertirla en métricas consultables desde
-Trino y Grafana. Incluye datos de Home Assistant, HomeKit y Sonoff, un generador
+Trino y Grafana. Incluye datos reales de Home Assistant mediante Matter sobre Zigbee y un generador
 sintético reproducible y cargas batch de AEMET y Datadis.
 
 La documentación funcional y operativa está en [docs](docs/).
 El modelo analítico consumido por Grafana se describe en
 [docs/GOLD_ANALYTICS.md](docs/GOLD_ANALYTICS.md).
 
-Lakehouse de la semana 1: Apache Iceberg, Silver idempotente y calidad auditable.
-El procedimiento, las decisiones y las pruebas están en [docs/SEMANA_1.md](docs/SEMANA_1.md),
-y el modelo de datos en [docs/CONTRATO_EVENTOS_V1.md](docs/CONTRATO_EVENTOS_V1.md).
+El lakehouse usa Apache Iceberg, Silver idempotente y calidad auditable. El contrato
+de eventos está definido en [docs/CONTRATO_EVENTOS_V1.md](docs/CONTRATO_EVENTOS_V1.md).
 
 Canalización ejecutable:
 
 ```text
-Matter ---------> Home Assistant -> MQTT/TLS -> mqtt-ingestor -> Redpanda -> Spark -> MinIO Iceberg Bronze/Silver/Gold -> Trino -> Grafana
-HomeKit --------/                                      ^
+Home Assistant (Matter sobre Zigbee) -> MQTT/TLS -> mqtt-ingestor -> Redpanda -> Spark -> MinIO Iceberg Bronze/Silver/Gold -> Trino -> Grafana
+                                                        ^
                                              synthetic-generator
 ```
 
@@ -30,13 +29,9 @@ HomeKit --------/                                      ^
 | Redpanda | Broker Kafka que desacopla productores y procesamiento. |
 | `spark-lakehouse` | Valida el contrato, deduplica, envía inválidos a cuarentena y actualiza Iceberg. |
 | MinIO + Hive Metastore | Almacenamiento S3 local y catálogo persistente de tablas Iceberg. |
-| Airflow + dbt | Orquestan AEMET, Datadis, anomalías y modelos batch Gold. |
+| Airflow + dbt | Orquestan AEMET, Datadis y modelos batch Gold. |
 | Trino | Consulta Iceberg y publica vistas analíticas estables. |
 | Grafana | Visualiza exclusivamente marts Gold mediante dashboards provisionados. |
-
-La ejecución normal usa el catálogo `tfm` y el metastore Iceberg 3.1.3. El perfil
-`legacy` contiene únicamente el flujo Parquet anterior y las herramientas de
-migración/rollback; no se arranca por defecto.
 
 ### Estructura del repositorio
 
@@ -55,7 +50,9 @@ su copia local con las columnas del inventario usado en desarrollo.
 
 ## Arranque
 
-1. Crear un entorno local para las utilidades y pruebas:
+1. El stack no necesita un entorno Python local: Docker construye las imágenes y
+   contiene las dependencias de ingesta, Spark y Airflow. El entorno virtual sólo es
+   opcional para ejecutar tests y scripts desde el host:
 
    ```bash
    python3 -m venv .venv
@@ -89,16 +86,13 @@ su copia local con las columnas del inventario usado en desarrollo.
 - Redpanda Console: http://localhost:8080
 - Grafana: http://localhost:3000
 - MinIO Console: http://localhost:9001
-- Filtro MQTT de entrada: `tfm/+/events/#`. Incluye `tfm/matter/events/#`,
-  `tfm/sonoff/events/#` y cualquier otro origen compatible con el contrato.
-  `tfm/homekit/events/#`.
-- Tópico de destino en Redpanda: `tfm.matter.events` (nombre histórico; contiene eventos Matter, HomeKit y Sonoff).
+- Filtro MQTT de entrada: `tfm/matter/events/#`.
+- Tópico de destino en Redpanda: `tfm.matter.events`.
 - El broker Kafka se publica localmente en `localhost:19092`.
 - El ingestor usa internamente `redpanda:9092`; no hace falta exponer Kafka a Internet.
 - `synthetic-generator` crea un histórico de demostración desde 40 días antes hasta el
   momento de ejecución y continúa generando datos cada 5 minutos para todas las entidades.
 - `spark-lakehouse` escribe tablas Iceberg v2 en `s3a://tfm-lakehouse` y usa el checkpoint `s3a://tfm-checkpoints/iceberg_v1`.
-- El baseline Parquet sigue disponible sólo para migración/rollback en el catálogo `tfm_legacy`; los jobs antiguos están detenidos en el perfil `legacy`.
 - Trino expone las tablas `tfm.bronze.matter_events`, `tfm.silver.matter_events` y `tfm.gold.entity_5m` por SQL en http://localhost:8081.
 
 Para consumir una muestra desde el contenedor de Redpanda:
@@ -108,26 +102,6 @@ docker compose exec redpanda rpk topic consume tfm.matter.events --brokers redpa
 ```
 
 El ingestor conserva el JSON de Home Assistant y añade `mqtt_topic` y `bridge_timestamp`.
-
-## Sensores ambientales HomeKit
-
-La automatización `TFM - HomeKit - publicar sensores ambientales en MQTT` publica por
-MQTT/TLS los cambios de seis entidades de temperatura y humedad expuestas en Home
-Assistant. Utiliza el espacio de tópicos `tfm/homekit/events/sensor/<entity_id>` y marca
-cada evento con `source=homekit` y `attributes.data_origin=homekit`.
-
-Las seis entidades HomeKit integradas son:
-
-- `sensor.temperatura_salon`
-- `sensor.temperatura_dormitorio_padres`
-- `sensor.temperatura_dormitorio_borja`
-- `sensor.humedad_salon`
-- `sensor.humedad_dormitorio_borja`
-- `sensor.humedad_dormitorio_padres`
-
-Recorren la misma canalización que Matter: Redpanda, Bronze, Silver, Gold, Trino y
-Grafana. El dashboard ambiental los incorpora automáticamente y el dashboard de estado
-incluye una sección específica con sus últimos valores.
 
 ## Datos sintéticos
 
@@ -177,8 +151,9 @@ explícitas; los retrasados válidos permanecen en Silver con advertencia. Gold 
 Silver las ventanas de 5 minutos afectadas, incluidas las históricas.
 
 Spark y Trino comparten el catálogo Iceberg sobre un Hive Metastore 3.1.3 persistente.
-El metastore 4.2.1 original conserva el baseline Parquet. Iceberg gestiona sus particiones y
-snapshots sin `trino-sync`. Las vistas compatibles conservan los nombres usados por Grafana.
+Iceberg gestiona sus particiones y
+snapshots sin procesos auxiliares de sincronización. Las vistas compatibles conservan
+los nombres usados por Grafana.
 Las tablas físicas son `tfm.iot_bronze.matter_events`, `tfm.iot_silver.matter_events`,
 `tfm.iot_gold.entity_5m` y `tfm.iot_quality.quarantine_events`.
 
@@ -217,7 +192,7 @@ El smoke envía telemetría sintética por MQTT/TLS, comprueba Bronze/Silver/cua
 reinicia Spark, repite el evento y ejecuta las consultas de los dashboards a través
 de Grafana. Para una alternativa sin broker doméstico, usar `--transport kafka`.
 Las evidencias se guardan en `docs/evidence/`. La importación Parquet y la suite de
-integración Iceberg están documentadas en [la guía de la semana 1](docs/SEMANA_1.md).
+integración Iceberg están documentadas en [docs/CONTRATO_EVENTOS_V1.md](docs/CONTRATO_EVENTOS_V1.md).
 
 Para validar la configuración antes de arrancar:
 
@@ -234,22 +209,15 @@ docker compose down
 Los volúmenes persistentes se conservan. `docker compose down -v` elimina el log Kafka,
 el lakehouse y los catálogos: no usarlo para un reinicio normal.
 
-## Batch meteorológico AEMET (semana 2)
+## Batch meteorológico AEMET
 
 Airflow está integrado en Docker Compose y disponible en http://localhost:8082.
 El DAG `aemet_daily_bronze` descarga diariamente climatología de AEMET, conserva el
 JSON original en Bronze MinIO, carga la estación configurada de forma idempotente en
 Iceberg Silver y ejecuta dbt para publicar `tfm.gold.environment_daily`. Configurar
-`AEMET_API_KEY` en `.env`. Programación, acceso, ejecución manual y venv:
+`AEMET_API_KEY` en `.env`. Programación, acceso y ejecución manual:
 [docs/AEMET_BATCH.md](docs/AEMET_BATCH.md).
 
 ## Batch eléctrico Datadis
 
 El DAG `datadis_daily_consumption` conserva la curva horaria de los suministros eléctricos en Bronze, la normaliza en Iceberg Silver y publica el agregado diario `tfm.gold.grid_energy_daily` para el dashboard de energía. La configuración, privacidad del CUPS y operación están en [docs/DATADIS_BATCH.md](docs/DATADIS_BATCH.md).
-
-## Detección de anomalías (semana 3)
-
-Los datos sintéticos pueden incluir anomalías etiquetadas y el DAG
-`anomaly_train_and_score` aplica reglas explicables e Isolation Forest para publicarlas
-en `tfm.iot_gold.anomaly_events`. La configuración, ejecución y consultas de
-validación están en [docs/SEMANA_3.md](docs/SEMANA_3.md).

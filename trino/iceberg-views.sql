@@ -5,7 +5,6 @@ CREATE SCHEMA IF NOT EXISTS tfm.gold;
 CREATE OR REPLACE VIEW tfm.bronze.matter_events AS SELECT * FROM tfm.iot_bronze.matter_events;
 CREATE OR REPLACE VIEW tfm.silver.matter_events AS SELECT * FROM tfm.iot_silver.matter_events;
 CREATE OR REPLACE VIEW tfm.gold.entity_5m AS SELECT * FROM tfm.iot_gold.entity_5m;
-CREATE OR REPLACE VIEW tfm.gold.anomaly_events AS SELECT * FROM tfm.iot_gold.anomaly_events;
 
 -- All observations, including quarantine and duplicate delivery decisions.
 CREATE OR REPLACE VIEW tfm.iot_quality.events AS
@@ -75,12 +74,12 @@ SELECT * FROM (VALUES
 ) AS t(room_id, room_name, associated_bedroom_id);
 CREATE OR REPLACE VIEW tfm.reference.environment_entities AS
 SELECT * FROM (VALUES
-    ('homekit', 'sensor.temperatura_salon', 'environment_living_room', 'living_room', 'temperature', 'living_room_temperature'),
-    ('homekit', 'sensor.humedad_salon', 'environment_living_room', 'living_room', 'humidity', 'living_room_humidity'),
-    ('homekit', 'sensor.temperatura_dormitorio_padres', 'environment_room_primary', 'room_primary', 'temperature', 'room_primary_temperature'),
-    ('homekit', 'sensor.humedad_dormitorio_padres', 'environment_room_primary', 'room_primary', 'humidity', 'room_primary_humidity'),
-    ('homekit', 'sensor.temperatura_dormitorio_borja', 'environment_room_3', 'room_3', 'temperature', 'room_3_temperature'),
-    ('homekit', 'sensor.humedad_dormitorio_borja', 'environment_room_3', 'room_3', 'humidity', 'room_3_humidity'),
+    ('matter', 'sensor.temperatura_salon', 'environment_living_room', 'living_room', 'temperature', 'living_room_temperature'),
+    ('matter', 'sensor.humedad_salon', 'environment_living_room', 'living_room', 'humidity', 'living_room_humidity'),
+    ('matter', 'sensor.temperatura_dormitorio_padres', 'environment_room_primary', 'room_primary', 'temperature', 'room_primary_temperature'),
+    ('matter', 'sensor.humedad_dormitorio_padres', 'environment_room_primary', 'room_primary', 'humidity', 'room_primary_humidity'),
+    ('matter', 'sensor.temperatura_dormitorio_borja', 'environment_room_3', 'room_3', 'temperature', 'room_3_temperature'),
+    ('matter', 'sensor.humedad_dormitorio_borja', 'environment_room_3', 'room_3', 'humidity', 'room_3_humidity'),
     ('matter', 'sensor.temperatura_bano_1', 'environment_bathroom_1', 'bathroom_1', 'temperature', 'bathroom_1_temperature'),
     ('matter', 'sensor.humedad_bano_1', 'environment_bathroom_1', 'bathroom_1', 'humidity', 'bathroom_1_humidity'),
     ('matter', 'sensor.temperatura_bano_2', 'environment_bathroom_2', 'bathroom_2', 'temperature', 'bathroom_2_temperature'),

@@ -2,7 +2,7 @@
 
 Vista Trino: `tfm.gold.environment_daily`.
 
-La vista resume los eventos ambientales reales por estancia y día. Usa las doce entidades confirmadas (temperatura y humedad de tres dispositivos HomeKit y tres Matter), excluye cuarentena y conserva los nombres neutros del modelo.
+La vista resume los eventos ambientales reales por estancia y día. Usa las entidades de temperatura y humedad de los dispositivos Matter integrados en Home Assistant, excluye cuarentena y conserva los nombres neutros del modelo.
 
 Incluye medias, mínimos y máximos interiores, número de eventos, número de entidades recibidas, primera y última recepción, indicadores de cobertura de temperatura/humedad y el contexto diario de la estación AEMET 9263D (Pamplona, Aeropuerto). Cuando coinciden las fechas, calcula también la diferencia entre temperatura interior y exterior. Si no existe dato meteorológico para un día, las columnas exteriores quedan en `NULL`; no se imputa ni se trata como cero.
 
