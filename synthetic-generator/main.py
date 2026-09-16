@@ -49,7 +49,8 @@ STATE_DIR = Path(os.getenv("SYNTHETIC_STATE_DIR", "/state"))
 DATASET_ID = os.getenv("SYNTHETIC_DATASET_ID", "tfm-demo-v1")
 ENTITY_PREFIX = os.getenv("SYNTHETIC_ENTITY_PREFIX", "synthetic_")
 SEED = env_int("SYNTHETIC_SEED", 20260913)
-BOOTSTRAP_HOURS = env_int("SYNTHETIC_BOOTSTRAP_HOURS", 24)
+# Forty days of deterministic history ending at the execution time.
+BOOTSTRAP_HOURS = env_int("SYNTHETIC_BOOTSTRAP_HOURS", 24 * 40)
 BOOTSTRAP_STEP_SECONDS = env_int("SYNTHETIC_BOOTSTRAP_STEP_SECONDS", 900, 60)
 INTERVAL_SECONDS = env_int("SYNTHETIC_INTERVAL_SECONDS", 300, 30)
 ENABLED = env_bool("SYNTHETIC_ENABLED", True)
@@ -109,11 +110,18 @@ def format_number(value: float, decimals: int = 2) -> str:
     return f"{value:.{decimals}f}".rstrip("0").rstrip(".")
 
 
-def synthetic_entity_id(original_entity_id: str) -> str:
-    if "." not in original_entity_id:
-        return f"synthetic.{ENTITY_PREFIX}{original_entity_id}"
-    domain, object_id = original_entity_id.split(".", 1)
-    return f"{domain}.{ENTITY_PREFIX}{object_id}"
+def synthetic_entity_id(original_entity_id: str, domain: str | None = None) -> str:
+    if "." in original_entity_id:
+        embedded_domain, object_id = original_entity_id.split(".", 1)
+    else:
+        embedded_domain, object_id = "", original_entity_id
+
+    effective_domain = (domain or embedded_domain).strip()
+    if not effective_domain:
+        raise ValueError(
+            f"No se puede construir el entity_id sintético sin dominio: {original_entity_id}"
+        )
+    return f"{effective_domain}.{ENTITY_PREFIX}{object_id}"
 
 
 def stringify_attribute(value: Any) -> str:
@@ -139,6 +147,40 @@ def load_inventory() -> list[dict[str, str]]:
         if row.get("entity_id")
         and (INCLUDE_REGISTRY_ONLY or row.get("entity_status") == "active")
     ]
+    # Enrich the real inventory with a deterministic synthetic sensor catalog.
+    # Synthetic entities share the same event contract and are published to
+    # the same Kafka topic, but are marked source=synthetic in the payload.
+    rooms = {
+        'dormitorio1': ['temperature', 'humidity', 'presence', 'co2', 'illuminance', 'light', 'door', 'window', 'power', 'hvac'],
+        'dormitorio2': ['temperature', 'humidity', 'presence', 'co2', 'illuminance', 'light', 'door', 'window', 'power', 'hvac'],
+        'dormitorio3': ['temperature', 'humidity', 'presence', 'co2', 'illuminance', 'light', 'door', 'window', 'power', 'hvac'],
+        'bano1': ['temperature', 'humidity', 'presence', 'co2', 'illuminance', 'light', 'door', 'window', 'power', 'extractor', 'water_flow', 'water_leak'],
+        'bano2': ['temperature', 'humidity', 'presence', 'co2', 'illuminance', 'light', 'door', 'window', 'power', 'extractor', 'water_flow', 'water_leak'],
+        'bano3': ['temperature', 'humidity', 'presence', 'co2', 'illuminance', 'light', 'door', 'window', 'power', 'extractor', 'water_flow', 'water_leak'],
+        'salon': ['temperature', 'humidity', 'presence', 'co2', 'illuminance', 'light', 'door', 'window', 'power', 'hvac'],
+        'hall': ['temperature', 'humidity', 'presence', 'co2', 'illuminance', 'light', 'window', 'power', 'lock'],
+        'garaje': ['temperature', 'humidity', 'presence', 'co2', 'co', 'illuminance', 'light', 'window', 'power', 'vehicle'],
+        'exterior': ['temperature', 'humidity', 'irradiance'],
+    }
+    specs = {
+        'temperature': ('sensor', 'temperature', '°C', '23'), 'humidity': ('sensor', 'humidity', '%', '50'),
+        'presence': ('binary_sensor', 'occupancy', '', 'off'), 'co2': ('sensor', 'carbon_dioxide', 'ppm', '600'),
+        'illuminance': ('sensor', 'illuminance', 'lx', '150'), 'light': ('light', '', '', 'off'),
+        'door': ('binary_sensor', 'door', '', 'off'), 'window': ('binary_sensor', 'window', '', 'off'),
+        'power': ('sensor', 'power', 'W', '0'), 'hvac': ('climate', '', '°C', 'off'),
+        'extractor': ('switch', '', '', 'off'), 'water_flow': ('sensor', 'water', 'L/min', '0'),
+        'water_leak': ('binary_sensor', 'moisture', '', 'off'), 'lock': ('lock', '', '', 'locked'),
+        'co': ('sensor', 'carbon_monoxide', 'ppm', '0'), 'vehicle': ('binary_sensor', 'presence', '', 'off'),
+        'irradiance': ('sensor', 'irradiance', 'W/m²', '0'),
+    }
+    for room, devices in rooms.items():
+        for device in devices:
+            domain, device_class, unit, current = specs[device]
+            selected.append({'device_id': f'synthetic_{room}_{device}', 'device_name': f'{device} {room}',
+                             'area_id': room, 'entity_id': f'{domain}.{device}_{room}',
+                             'entity_name': f'{device} {room}', 'domain': domain, 'entity_status': 'active',
+                             'current_state': current, 'unit_of_measurement': unit, 'device_class': device_class,
+                             'state_class': 'measurement' if domain == 'sensor' else '', 'attributes_json': '{}'})
     selected.sort(key=lambda row: (row.get("domain", ""), row["entity_id"]))
     LOGGER.info(
         "Inventario cargado entities=%s total=%s include_registry_only=%s",
@@ -203,7 +245,7 @@ def device_load_watts(row: dict[str, str], timestamp: datetime) -> float:
     if "lampara" in hint or "luz" in hint:
         active = hour >= 18.0 or hour <= 1.0
         return rng.uniform(6, 45) if active and rng.random() < 0.72 else 0.0
-    return rng.uniform(2, 25) if rng.random() < 0.15 else 0.0
+    return rng.uniform(8, 35)
 
 
 def binary_state(row: dict[str, str], timestamp: datetime) -> str:
@@ -324,7 +366,7 @@ def inject_anomaly(row: dict[str, str], timestamp: datetime, state: str) -> tupl
 
 def build_event(row: dict[str, str], timestamp: datetime) -> tuple[str, dict[str, Any]]:
     original_entity_id = row["entity_id"]
-    entity_id = synthetic_entity_id(original_entity_id)
+    entity_id = synthetic_entity_id(original_entity_id, row.get("domain"))
     event_identifier = str(
         uuid.uuid5(
             uuid.NAMESPACE_URL,

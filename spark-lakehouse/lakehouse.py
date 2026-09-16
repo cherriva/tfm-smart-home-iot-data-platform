@@ -22,6 +22,8 @@ INVENTORY = "lake.iot_quality.sensor_inventory"
 AEMET_DAILY = "lake.iot_silver.aemet_daily"
 DATADIS_CONSUMPTION = "lake.iot_silver.datadis_consumption_hourly"
 ANOMALY_EVENTS = "lake.iot_gold.anomaly_events"
+ROOM_LATEST = "lake.iot_gold.room_latest_state"
+ROOM_HOURLY = "lake.iot_gold.room_hourly"
 
 STRING_FIELDS = """event_id source entity_id domain state unit device_class area_id friendly_name
 attributes_json event_timestamp updated_timestamp ingestion_timestamp bridge_timestamp mqtt_topic
@@ -77,6 +79,13 @@ def initialize(spark):
         avg_numeric_state double, min_numeric_state double, max_numeric_state double,
         last_event_time timestamp, event_date date
     ) USING iceberg PARTITIONED BY (days(window_start)) TBLPROPERTIES ('format-version'='2')""")
+    spark.sql(f"""CREATE TABLE IF NOT EXISTS {ROOM_LATEST} (
+        source string, entity_id string, domain string, area_id string,
+        friendly_name string, state string, numeric_state double, unit string,
+        device_class string, event_time timestamp, quality_flag string,
+        attributes map<string,string>
+      ) USING iceberg TBLPROPERTIES ('format-version'='2')""")
+    spark.sql(f"""CREATE TABLE IF NOT EXISTS {ROOM_HOURLY} (time timestamp, room string, temperature_c double, humidity_pct double, co2_ppm double) USING iceberg PARTITIONED BY (days(time))""")
     spark.sql(f"""CREATE TABLE IF NOT EXISTS {INVENTORY} (
         source string, entity_id string, domain string, area_id string,
         inactivity_seconds bigint
@@ -149,8 +158,26 @@ def refresh_gold(spark, valid):
         ON t.source = s.source AND t.entity_id = s.entity_id AND t.domain = s.domain
         AND t.unit <=> s.unit AND t.window_start = s.window_start
         WHEN MATCHED THEN UPDATE SET * WHEN NOT MATCHED THEN INSERT *""")
-
-
+    latest = (spark.table(SILVER)
+        .withColumn("rn", F.row_number().over(Window.partitionBy("source", "entity_id").orderBy(F.col("event_time").desc(), F.col("bronze_timestamp").desc())))
+        .filter("rn = 1").drop("rn")
+        .select("source", "entity_id", "domain", "area_id", "friendly_name", "state", "numeric_state", "unit", "device_class", "event_time", "quality_flag", "attributes"))
+    latest.createOrReplaceTempView("incoming_latest")
+    spark.sql(f"""MERGE INTO {ROOM_LATEST} t USING incoming_latest s
+        ON t.source = s.source AND t.entity_id = s.entity_id
+        WHEN MATCHED THEN UPDATE SET * WHEN NOT MATCHED THEN INSERT *""")
+    # Dashboard marts: one row per room and time grain, derived from Silver.
+    base = spark.table(SILVER).withColumn("room", F.coalesce("area_id", F.regexp_extract("entity_id", r"(?:synthetic_)?([^.]*)", 1)))
+    hourly = (base.withColumn("time", F.date_trunc("hour", "event_time"))
+        .groupBy("time", "room")
+        # Keep physically plausible room temperatures out of the dashboard
+        # aggregate. Outlier values are retained in Silver for quality analysis
+        # but must not become the room temperature shown to users.
+        .agg(F.max(F.when(((F.col("device_class") == "temperature") | F.col("entity_id").contains("temperature_")) & F.col("numeric_state").between(-40, 35), F.col("numeric_state"))).alias("temperature_c"),
+             F.max(F.when((F.col("device_class") == "humidity") | F.col("entity_id").contains("humidity_"), F.col("numeric_state"))).alias("humidity_pct"),
+             F.max(F.when(F.col("device_class") == "carbon_dioxide", F.col("numeric_state"))).alias("co2_ppm")))
+    hourly.createOrReplaceTempView("room_hourly_in")
+    spark.sql(f"MERGE INTO {ROOM_HOURLY} t USING room_hourly_in s ON t.time=s.time AND t.room=s.room WHEN MATCHED THEN UPDATE SET * WHEN NOT MATCHED THEN INSERT *")
 def process_batch(spark, raw_frame, batch_id, config):
     if raw_frame.isEmpty():
         return
@@ -192,7 +219,8 @@ def load_inventory(spark, config):
                 rows.append(("matter", row["entity_id"], "sensor", row.get("area_id") or None, config.inactivity_seconds))
                 if row.get("entity_status") == "active":
                     prefix = os.getenv("SYNTHETIC_ENTITY_PREFIX", "synthetic_")
-                    rows.append(("synthetic", "sensor." + prefix + row["entity_id"].split(".", 1)[1],
+                suffix = row["entity_id"].split(".", 1)[1] if "." in row["entity_id"] else row["entity_id"]
+                rows.append(("synthetic", "sensor." + prefix + suffix,
                                  "sensor", row.get("area_id") or None, config.inactivity_seconds))
     for entity in os.getenv("HOMEKIT_SENSOR_ENTITIES", "").split(","):
         if entity.strip():

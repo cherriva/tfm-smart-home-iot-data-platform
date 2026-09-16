@@ -1,0 +1,513 @@
+{
+  "uid": "tfm-ingestion",
+  "title": "📥 Ingesta y Calidad por Capas",
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "5m",
+  "time": {
+    "from": "now-40d",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Registros Bronze",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT bronze_records value FROM tfm.iot_gold.ingestion_summary",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Registros Silver",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT silver_records value FROM tfm.iot_gold.ingestion_summary",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Registros Gold",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT gold_records value FROM tfm.iot_gold.ingestion_summary",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Registros en cuarentena",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT quarantine_records value FROM tfm.iot_gold.ingestion_summary",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Pendientes de clasificar",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 4
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT greatest(bronze_records-silver_records-quarantine_records,0) value FROM tfm.iot_gold.ingestion_summary",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Aceptación Silver",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 4
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT CAST(silver_acceptance_pct AS double) AS value FROM tfm.iot_gold.ingestion_summary",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Cobertura Gold",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 4
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT CAST(gold_coverage_pct AS double) AS value FROM tfm.iot_gold.ingestion_summary",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Último registro Bronze",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 4
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT last_bronze_record value FROM tfm.iot_gold.ingestion_summary",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeFromNow"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Último registro Silver",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 8
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT last_silver_record value FROM tfm.iot_gold.ingestion_summary",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeFromNow"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Última ventana Gold",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 8
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT last_gold_window value FROM tfm.iot_gold.ingestion_summary",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeFromNow"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "type": "barchart",
+      "title": "Volumen actual por capa",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT layer, CAST(records AS double) AS records FROM (SELECT 'Bronze' layer,bronze_records records FROM tfm.iot_gold.ingestion_summary UNION ALL SELECT 'Silver',silver_records FROM tfm.iot_gold.ingestion_summary UNION ALL SELECT 'Gold',gold_records FROM tfm.iot_gold.ingestion_summary UNION ALL SELECT 'Cuarentena',quarantine_records FROM tfm.iot_gold.ingestion_summary) ORDER BY records DESC",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Registros procesados por hora y capa",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT time,layer metric,CAST(records AS double) value FROM tfm.iot_gold.ingestion_hourly WHERE $__timeFilter(time) ORDER BY 1,2",
+          "format": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 13,
+      "type": "barchart",
+      "title": "Aceptación por origen",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT source,CAST(acceptance_pct AS double) AS acceptance_pct FROM tfm.iot_gold.ingestion_quality ORDER BY acceptance_pct",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 14,
+      "type": "table",
+      "title": "Volumen y calidad por origen",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT source,bronze_records,accepted_records,quarantined_records,duplicate_records,acceptance_pct,last_processed_at,last_event_at,avg_source_latency_ms FROM tfm.iot_gold.ingestion_quality ORDER BY bronze_records DESC",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 15,
+      "type": "barchart",
+      "title": "Causas de cuarentena",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 28
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT quality_flag,source,records FROM tfm.iot_gold.quarantine_causes ORDER BY records DESC",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 16,
+      "type": "barchart",
+      "title": "Frescura por sensor",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 28
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT entity_id,source,CAST(minutes_since_received AS double) AS minutes_since_received FROM tfm.iot_gold.sensor_health ORDER BY minutes_since_received DESC NULLS FIRST LIMIT 100",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "m"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 17,
+      "type": "table",
+      "title": "Último registro por origen",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 36
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT source,last_processed_at,last_event_at,bronze_records,acceptance_pct FROM tfm.iot_gold.ingestion_quality ORDER BY last_processed_at DESC",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 18,
+      "type": "timeseries",
+      "title": "Calidad temporal",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 36
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT time,source metric,CAST(valid_ratio_pct AS double) value FROM tfm.iot_gold.data_quality WHERE $__timeFilter(time) ORDER BY 1,2",
+          "format": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

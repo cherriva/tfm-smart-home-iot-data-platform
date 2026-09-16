@@ -124,7 +124,7 @@ def _number(value):
 
 
 def silver_key(target_date: date) -> str:
-    return f'aemet/daily/year={target_date.year}/month={target_date.month:02d}/day={target_date.day:02d}/data.jsonl'
+    return f'iot_silver/aemet_daily/staging/year={target_date.year}/month={target_date.month:02d}/day={target_date.day:02d}/data.jsonl'
 
 
 def transform_silver(payload: bytes, station_id: str = '9263D') -> list[dict]:
@@ -155,7 +155,7 @@ def save_silver(payload: bytes, target_date: date, station_id: str = '9263D') ->
     client = boto3.client('s3', endpoint_url=endpoint, aws_access_key_id=os.environ['MINIO_ROOT_USER'],
                           aws_secret_access_key=os.environ['MINIO_ROOT_PASSWORD'], region_name='us-east-1',
                           config=Config(s3={'addressing_style': 'path'}))
-    bucket = os.getenv('AEMET_SILVER_BUCKET', 'tfm-silver')
+    bucket = os.getenv('AEMET_SILVER_BUCKET', 'tfm-lakehouse')
     key = silver_key(target_date)
     body = ('\n'.join(json.dumps(r, ensure_ascii=False, sort_keys=True) for r in records) + '\n').encode()
     client.put_object(Bucket=bucket, Key=key, Body=body, ContentType='application/x-ndjson',

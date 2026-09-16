@@ -1,6 +1,13 @@
 # TFM Smart Home IoT
 
+Plataforma local de datos IoT para recoger telemetría de un hogar, validarla,
+almacenarla en un lakehouse Iceberg y convertirla en métricas consultables desde
+Trino y Grafana. Incluye datos de Home Assistant, HomeKit y Sonoff, un generador
+sintético reproducible y cargas batch de AEMET y Datadis.
+
 La documentación funcional y operativa está en [docs](docs/).
+El modelo analítico consumido por Grafana se describe en
+[docs/GOLD_ANALYTICS.md](docs/GOLD_ANALYTICS.md).
 
 Lakehouse de la semana 1: Apache Iceberg, Silver idempotente y calidad auditable.
 El procedimiento, las decisiones y las pruebas están en [docs/SEMANA_1.md](docs/SEMANA_1.md),
@@ -13,6 +20,38 @@ Matter ---------> Home Assistant -> MQTT/TLS -> mqtt-ingestor -> Redpanda -> Spa
 HomeKit --------/                                      ^
                                              synthetic-generator
 ```
+
+### Componentes
+
+| Componente | Función |
+|---|---|
+| `mqtt-ingestor` | Consume MQTT/TLS, normaliza identificadores y publica eventos en Redpanda. |
+| `synthetic-generator` | Genera histórico y nuevas muestras cada 5 minutos para demos y pruebas. |
+| Redpanda | Broker Kafka que desacopla productores y procesamiento. |
+| `spark-lakehouse` | Valida el contrato, deduplica, envía inválidos a cuarentena y actualiza Iceberg. |
+| MinIO + Hive Metastore | Almacenamiento S3 local y catálogo persistente de tablas Iceberg. |
+| Airflow + dbt | Orquestan AEMET, Datadis, anomalías y modelos batch Gold. |
+| Trino | Consulta Iceberg y publica vistas analíticas estables. |
+| Grafana | Visualiza exclusivamente marts Gold mediante dashboards provisionados. |
+
+La ejecución normal usa el catálogo `tfm` y el metastore Iceberg 3.1.3. El perfil
+`legacy` contiene únicamente el flujo Parquet anterior y las herramientas de
+migración/rollback; no se arranca por defecto.
+
+### Estructura del repositorio
+
+```text
+airflow/                  DAGs y jobs batch       dbt/                     modelos Gold
+grafana/                  dashboards y provisión  hive/                    metastore
+mqtt-ingestor/            MQTT → Redpanda         spark-lakehouse/          streaming Iceberg
+synthetic-generator/      datos de demostración   trino/                   catálogos y vistas SQL
+scripts/                  validación y operación  tests/                   pruebas de contratos
+docs/                     decisiones y evidencias
+```
+
+`matter_inventory.csv` se monta en Spark y en el generador, pero está ignorado por
+Git porque puede contener inventario doméstico. Cada instalación debe proporcionar
+su copia local con las columnas del inventario usado en desarrollo.
 
 ## Arranque
 
@@ -56,10 +95,10 @@ HomeKit --------/                                      ^
 - Tópico de destino en Redpanda: `tfm.matter.events` (nombre histórico; contiene eventos Matter, HomeKit y Sonoff).
 - El broker Kafka se publica localmente en `localhost:19092`.
 - El ingestor usa internamente `redpanda:9092`; no hace falta exponer Kafka a Internet.
-- `synthetic-generator` crea un histórico de demostración de 24 horas y continúa generando
-  datos cada 5 minutos para todas las entidades activas del inventario.
+- `synthetic-generator` crea un histórico de demostración desde 40 días antes hasta el
+  momento de ejecución y continúa generando datos cada 5 minutos para todas las entidades.
 - `spark-lakehouse` escribe tablas Iceberg v2 en `s3a://tfm-lakehouse` y usa el checkpoint `s3a://tfm-checkpoints/iceberg_v1`.
-- El baseline Parquet sigue disponible en el catálogo `tfm_legacy`; los jobs antiguos están detenidos en el perfil `legacy`.
+- El baseline Parquet sigue disponible sólo para migración/rollback en el catálogo `tfm_legacy`; los jobs antiguos están detenidos en el perfil `legacy`.
 - Trino expone las tablas `tfm.bronze.matter_events`, `tfm.silver.matter_events` y `tfm.gold.entity_5m` por SQL en http://localhost:8081.
 
 Para consumir una muestra desde el contenedor de Redpanda:
@@ -144,19 +183,11 @@ Las tablas físicas son `tfm.iot_bronze.matter_events`, `tfm.iot_silver.matter_e
 `tfm.iot_gold.entity_5m` y `tfm.iot_quality.quarantine_events`.
 
 Grafana se provisiona automáticamente con el plugin de Trino, la fuente de datos `Trino`
-y cinco dashboards: visión general, sensores ambientales, actividad de dispositivos,
-calidad de la plataforma IoT y estado actual por entidad. El usuario inicial es `admin` y la contraseña se toma de
+y once dashboards. `TFM Smart Home` contiene la visión general y los dominios de confort,
+energía, ocupación, aire, seguridad, agua, HVAC y garaje. `TFM Platform` contiene calidad
+del dato e ingesta por capas. Las definiciones se revisan cada 30 segundos y consultan
+exclusivamente marts Gold. El usuario inicial es `admin` y la contraseña se toma de
 `GRAFANA_ADMIN_PASSWORD`.
-
-Los dashboards están en la carpeta `TFM Smart Home` y se actualizan cada 30 segundos:
-
-- `01 - Visión general del hogar`: Bronze, Silver, Gold, actividad y últimos eventos.
-- `02 - Sensores ambientales`: temperatura, humedad, estadísticas y último valor conocido.
-- `03 - Actividad de dispositivos`: estados, luces, interruptores, botones, puertas y cerraduras.
-- `04 - Calidad de la plataforma IoT`: validez, latencia, cobertura temporal, cuarentena,
-  duplicados y sensores sin actividad.
-- `05 - Panel de control por dispositivo`: último KPI, estado, estancia y actualización de
-  cada entidad activa, con vistas específicas de ambiente, accesos, luces e interruptores.
 
 Para actualizar las vistas y dashboards en una instalación con las tablas Iceberg creadas:
 
@@ -183,10 +214,16 @@ docker compose exec trino trino --server http://localhost:8080 --user tfm \
 ```
 
 El smoke envía telemetría sintética por MQTT/TLS, comprueba Bronze/Silver/cuarentena/Gold,
-reinicia Spark, repite el evento y ejecuta las consultas de los cinco dashboards a través
+reinicia Spark, repite el evento y ejecuta las consultas de los dashboards a través
 de Grafana. Para una alternativa sin broker doméstico, usar `--transport kafka`.
 Las evidencias se guardan en `docs/evidence/`. La importación Parquet y la suite de
 integración Iceberg están documentadas en [la guía de la semana 1](docs/SEMANA_1.md).
+
+Para validar la configuración antes de arrancar:
+
+```bash
+docker compose config --quiet
+```
 
 ## Parada
 

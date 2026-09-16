@@ -42,7 +42,7 @@ Ruta Bronze: `s3://tfm-bronze/aemet/daily/year=YYYY/month=MM/day=DD/data.json`.
 
 Se conserva el cuerpo original de la respuesta de datos, incluso su codificación. No se guarda la clave ni la URL temporal. Los metadatos S3 incluyen fecha objetivo, fuente, instante de descarga, número de registros y SHA-256. Se relee el objeto para comprobar su integridad.
 
-El JSON crudo Bronze no se modifica. En la misma ejecución se selecciona la estación configurada (`AEMET_STATION_ID`, `9263D` por defecto), se conserva un JSONL de staging en `s3://tfm-silver/aemet/daily/.../data.jsonl` y se hace un `MERGE` idempotente en `tfm.iot_silver.aemet_daily`. dbt construye la vista canónica `tfm.gold.environment_daily`, que une el resumen interior real con AEMET por día y habitación.
+El JSON crudo Bronze no se modifica. En la misma ejecución se selecciona la estación configurada (`AEMET_STATION_ID`, `9263D` por defecto), se conserva un JSONL de staging en `s3://tfm-lakehouse/iot_silver/aemet_daily/staging/.../data.jsonl` y se hace un `MERGE` idempotente en `tfm.iot_silver.aemet_daily`. dbt construye la vista canónica `tfm.gold.environment_daily`, que une el resumen interior real con AEMET por día y habitación.
 
 Repetir una fecha escribe la misma clave de objeto y actualiza la fila Iceberg de estación/día mediante `MERGE`; no añade duplicados. Una corrección publicada por AEMET sustituye el contenido anterior y la fila derivada. Un fallo de API o validación no sobrescribe el objeto previo; si falla la carga posterior a Iceberg, Bronze queda conservado y el DAG falla para que el reintento complete la convergencia.
 

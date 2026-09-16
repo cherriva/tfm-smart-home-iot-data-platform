@@ -4,7 +4,7 @@ La canalización `datadis_daily_consumption` descarga la curva horaria de los su
 
 ## Configuración
 
-Configurar `.env` a partir de `.env.example`. Las únicas credenciales son `DATADIS_USERNAME` y `DATADIS_PASSWORD`; no se incluyen en el repositorio, logs ni imagen Docker. `DATADIS_LOOKBACK_MONTHS` controla la ventana móvil que se vuelve a consultar (2 meses por defecto), una medida para incorporar lecturas corregidas por la distribuidora.
+Configurar `.env` a partir de `.env.example`. Las únicas credenciales son `DATADIS_USERNAME` y `DATADIS_PASSWORD`; no se incluyen en el repositorio, logs ni imagen Docker. `DATADIS_LOOKBACK_MONTHS` controla la ventana móvil que se vuelve a consultar (3 meses por defecto), una medida para incorporar lecturas corregidas por la distribuidora.
 `DATADIS_REQUEST_DELAY_SECONDS` separa las consultas de varios suministros (65 segundos por defecto) para respetar el límite de frecuencia de Datadis.
 
 Para desarrollo local, `DATADIS_S3_ENDPOINT` es `http://localhost:9000`; el contenedor Airflow usa automáticamente `http://minio:9000`.

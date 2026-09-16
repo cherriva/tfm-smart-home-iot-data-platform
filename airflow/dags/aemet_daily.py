@@ -23,7 +23,7 @@ def aemet_daily():
         else:
             # Stable across retries, based on the scheduled interval boundary.
             anchor = context.get('data_interval_end') or context['dag_run'].run_after
-            target = anchor.in_timezone('Europe/Madrid').date() - timedelta(days=int(os.getenv('AEMET_LAG_DAYS', '4')))
+            target = pendulum.instance(anchor).in_timezone('Europe/Madrid').date() - timedelta(days=int(os.getenv('AEMET_LAG_DAYS', '4')))
         return run(target)
     @task(execution_timeout=timedelta(minutes=5))
     def build_dbt():
@@ -60,8 +60,10 @@ def aemet_daily():
         result = {'aemet_rows': int(data[0][0]) if data else 0,
                   'gold_rows': int(data[0][1]) if data else 0,
                   'rooms': int(data[0][2]) if data else 0}
-        if result['aemet_rows'] == 0 or result['gold_rows'] == 0:
-            raise RuntimeError('Silver AEMET o Gold ambiental vacía')
+        if result['aemet_rows'] == 0:
+            raise RuntimeError('Silver AEMET vacía')
+        if result['gold_rows'] == 0:
+            print('Aviso: Gold ambiental no tiene filas interiores para las fechas disponibles', flush=True)
         print('Gold ambiental validada:', result, flush=True)
         return result
 

@@ -1,0 +1,233 @@
+{
+  "uid": "tfm-security",
+  "title": "🚪 Accesos y Seguridad",
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "5m",
+  "time": {
+    "from": "now-40d",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Accesos abiertos",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT count(*) value FROM tfm.iot_gold.room_latest_state WHERE (device_class IN ('door','window','opening') OR entity_id LIKE '%door%' OR entity_id LIKE '%window%') AND lower(state) IN ('on','open','unlocked')",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Fugas detectadas",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT count(*) value FROM tfm.iot_gold.room_latest_state WHERE (device_class='moisture' OR entity_id LIKE '%leak%') AND lower(state) IN ('on','wet')",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Aperturas en el periodo",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT count_if(event_type='opened') value FROM tfm.iot_gold.access_events WHERE $__timeFilter(event_time)",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Minutos abiertos",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT coalesce(CAST(sum(open_duration_minutes) AS double), 0.0) AS value FROM tfm.iot_gold.access_events WHERE $__timeFilter(event_time)",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "m"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "barchart",
+      "title": "Aperturas por acceso",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT entity_id, count_if(event_type='opened') openings FROM tfm.iot_gold.access_events WHERE $__timeFilter(event_time) GROUP BY entity_id ORDER BY 2 DESC",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "state-timeline",
+      "title": "Timeline de accesos",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT event_time time, entity_id metric, access_state value FROM tfm.iot_gold.access_events WHERE $__timeFilter(event_time) ORDER BY 1,2",
+          "format": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "barchart",
+      "title": "Duración abierta",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT entity_id, CAST(sum(open_duration_minutes) AS double) AS total_minutes, CAST(max(open_duration_minutes) AS double) AS max_minutes FROM tfm.iot_gold.access_events WHERE $__timeFilter(event_time) GROUP BY entity_id ORDER BY 2 DESC",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "m"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Eventos relevantes",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT event_time, room, entity_id, event_type, open_duration_minutes FROM tfm.iot_gold.access_events WHERE $__timeFilter(event_time) ORDER BY event_time DESC LIMIT 200",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,261 @@
+{
+  "uid": "tfm-water",
+  "title": "🚿 Agua y Baños",
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "5m",
+  "time": {
+    "from": "now-40d",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Agua hoy",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT coalesce(sum(water_liters),0) value FROM tfm.iot_gold.water_daily WHERE day=current_date",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "litre"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Agua este mes",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT coalesce(CAST(sum(water_liters) AS double), 0.0) AS value FROM tfm.iot_gold.water_daily WHERE date_trunc('month',day)=date_trunc('month',current_date)",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "litre"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Duchas estimadas",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT count(*) value FROM tfm.iot_gold.shower_events WHERE $__timeFilter(shower_start)",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Duración media ducha",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT avg(duration_minutes) value FROM tfm.iot_gold.shower_events WHERE $__timeFilter(shower_start)",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "m"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Consumo medio ducha",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 4
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT avg(water_liters) value FROM tfm.iot_gold.shower_events WHERE $__timeFilter(shower_start)",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "litre"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Baño que más consume",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 4
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT room, CAST(sum(water_liters) AS double) AS water_liters FROM tfm.iot_gold.water_daily WHERE $__timeFilter(CAST(day AS timestamp)) GROUP BY room ORDER BY water_liters DESC LIMIT 1",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "barchart",
+      "title": "Consumo de agua diario",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT day, room, CAST(water_liters AS double) AS water_liters FROM tfm.iot_gold.water_daily WHERE $__timeFilter(CAST(day AS timestamp)) ORDER BY day,room",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "litre"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Flujo de agua",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT shower_start time, room metric, peak_flow_l_min value FROM tfm.iot_gold.shower_events WHERE $__timeFilter(shower_start) ORDER BY 1,2",
+          "format": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "litre/min"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Duchas detectadas",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT room, shower_start, duration_minutes, water_liters, peak_flow_l_min FROM tfm.iot_gold.shower_events WHERE $__timeFilter(shower_start) ORDER BY shower_start DESC",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    }
+  ]
+}

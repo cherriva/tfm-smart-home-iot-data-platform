@@ -1,6 +1,6 @@
 {
-  "uid": "tfm-home-overview",
-  "title": "🏠 Home Overview",
+  "uid": "tfm-data-quality",
+  "title": "🔧 IoT & Data Quality",
   "schemaVersion": 41,
   "version": 1,
   "refresh": "5m",
@@ -12,7 +12,7 @@
     {
       "id": 1,
       "type": "stat",
-      "title": "Temperatura media actual",
+      "title": "Sensores activos",
       "gridPos": {
         "h": 4,
         "w": 6,
@@ -26,13 +26,13 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT avg(numeric_state) value FROM tfm.iot_gold.room_latest_state WHERE device_class='temperature'",
+          "rawSQL": "SELECT count_if(activity_status='active') value FROM tfm.iot_gold.sensor_health",
           "format": 1
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "celsius"
+          "unit": "short"
         },
         "overrides": []
       }
@@ -40,7 +40,7 @@
     {
       "id": 2,
       "type": "stat",
-      "title": "Humedad media actual",
+      "title": "Sensores sin reportar",
       "gridPos": {
         "h": 4,
         "w": 6,
@@ -54,13 +54,13 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT avg(numeric_state) value FROM tfm.iot_gold.room_latest_state WHERE device_class='humidity'",
+          "rawSQL": "SELECT count_if(activity_status<>'active') value FROM tfm.iot_gold.sensor_health",
           "format": 1
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percent"
+          "unit": "short"
         },
         "overrides": []
       }
@@ -68,7 +68,7 @@
     {
       "id": 3,
       "type": "stat",
-      "title": "CO₂ medio actual",
+      "title": "Eventos recibidos 24h",
       "gridPos": {
         "h": 4,
         "w": 6,
@@ -82,13 +82,13 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT avg(numeric_state) value FROM tfm.iot_gold.room_latest_state WHERE device_class='carbon_dioxide'",
+          "rawSQL": "SELECT sum(received_events) value FROM tfm.iot_gold.data_quality WHERE time >= current_timestamp - INTERVAL '24' HOUR",
           "format": 1
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "ppm"
+          "unit": "short"
         },
         "overrides": []
       }
@@ -96,7 +96,7 @@
     {
       "id": 4,
       "type": "stat",
-      "title": "Potencia estimada actual",
+      "title": "Datos válidos",
       "gridPos": {
         "h": 4,
         "w": 6,
@@ -110,13 +110,13 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT sum(avg_power_kw) value FROM tfm.iot_gold.energy_hourly WHERE time=(SELECT max(time) FROM tfm.iot_gold.energy_hourly)",
+          "rawSQL": "SELECT coalesce(CAST(100*sum(valid_events) AS double)/nullif(sum(received_events),0), 0.0) AS value FROM tfm.iot_gold.data_quality WHERE $__timeFilter(time)",
           "format": 1
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "kW"
+          "unit": "percent"
         },
         "overrides": []
       }
@@ -124,7 +124,7 @@
     {
       "id": 5,
       "type": "stat",
-      "title": "Confort global",
+      "title": "Datos reales",
       "gridPos": {
         "h": 4,
         "w": 6,
@@ -138,7 +138,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT avg(comfort_score) value FROM tfm.iot_gold.comfort_hourly WHERE $__timeFilter(time)",
+          "rawSQL": "SELECT coalesce(CAST(100*sum(CASE WHEN source<>'synthetic' THEN received_events ELSE 0 END) AS double)/nullif(sum(received_events),0), 0.0) AS value FROM tfm.iot_gold.data_quality WHERE $__timeFilter(time)",
           "format": 1
         }
       ],
@@ -152,7 +152,7 @@
     {
       "id": 6,
       "type": "stat",
-      "title": "Estancias ocupadas",
+      "title": "Datos sintéticos",
       "gridPos": {
         "h": 4,
         "w": 6,
@@ -166,13 +166,13 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT count_if(occupied) value FROM tfm.iot_gold.occupancy_hourly WHERE time=(SELECT max(time) FROM tfm.iot_gold.occupancy_hourly)",
+          "rawSQL": "SELECT coalesce(CAST(100*sum(CASE WHEN source='synthetic' THEN received_events ELSE 0 END) AS double)/nullif(sum(received_events),0), 0.0) AS value FROM tfm.iot_gold.data_quality WHERE $__timeFilter(time)",
           "format": 1
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "percent"
         },
         "overrides": []
       }
@@ -180,7 +180,7 @@
     {
       "id": 7,
       "type": "stat",
-      "title": "Accesos abiertos",
+      "title": "Registros Gold",
       "gridPos": {
         "h": 4,
         "w": 6,
@@ -194,7 +194,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT count(*) value FROM tfm.iot_gold.room_latest_state WHERE (device_class IN ('door','window','opening') OR entity_id LIKE '%door%' OR entity_id LIKE '%window%') AND lower(state) IN ('on','open','unlocked')",
+          "rawSQL": "SELECT count(*) value FROM tfm.iot_gold.entity_5m WHERE $__timeFilter(window_start)",
           "format": 1
         }
       ],
@@ -207,13 +207,13 @@
     },
     {
       "id": 8,
-      "type": "stat",
-      "title": "Calidad del dato",
+      "type": "barchart",
+      "title": "Frescura del dato",
       "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 4
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
       },
       "datasource": {
         "type": "trino-datasource",
@@ -222,13 +222,13 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT 100*sum(valid_events)/nullif(sum(received_events),0) value FROM tfm.iot_gold.data_quality WHERE $__timeFilter(time)",
+          "rawSQL": "SELECT entity_id, CAST(minutes_since_received AS double) AS minutes_since_received FROM tfm.iot_gold.sensor_health ORDER BY minutes_since_received DESC NULLS FIRST LIMIT 100",
           "format": 1
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percent"
+          "unit": "m"
         },
         "overrides": []
       }
@@ -236,35 +236,7 @@
     {
       "id": 9,
       "type": "timeseries",
-      "title": "Temperatura por estancia",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 8
-      },
-      "datasource": {
-        "type": "trino-datasource",
-        "uid": "tfm-trino"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "rawSQL": "SELECT time, room metric, temperature_c value FROM tfm.iot_gold.comfort_hourly WHERE $__timeFilter(time) ORDER BY 1,2",
-          "format": 0
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "celsius"
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 10,
-      "type": "timeseries",
-      "title": "Potencia del hogar",
+      "title": "Completitud por hora",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -278,68 +250,96 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT time, source metric, sum(avg_power_kw) value FROM tfm.iot_gold.energy_hourly WHERE $__timeFilter(time) GROUP BY 1,2 ORDER BY 1,2",
+          "rawSQL": "SELECT time, source metric, CAST(valid_ratio_pct AS double) value FROM tfm.iot_gold.data_quality WHERE $__timeFilter(time) ORDER BY 1,2",
           "format": 0
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "kW"
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 11,
-      "type": "table",
-      "title": "Estado actual por estancia",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 16
-      },
-      "datasource": {
-        "type": "trino-datasource",
-        "uid": "tfm-trino"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "rawSQL": "SELECT area_id estancia,entity_id,state,numeric_state,unit,device_class,event_time FROM tfm.iot_gold.room_latest_state ORDER BY 1,2",
-          "format": 1
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      }
-    },
-    {
-      "id": 12,
-      "type": "barchart",
-      "title": "Confort por habitación",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 16
-      },
-      "datasource": {
-        "type": "trino-datasource",
-        "uid": "tfm-trino"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "rawSQL": "SELECT room,avg(comfort_score) comfort_pct FROM tfm.iot_gold.comfort_hourly WHERE $__timeFilter(time) GROUP BY room ORDER BY 2 DESC",
-          "format": 1
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "percent"
         },
+        "overrides": []
+      }
+    },
+    {
+      "id": 10,
+      "type": "piechart",
+      "title": "Real vs sintético",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT source, sum(received_events) value FROM tfm.iot_gold.data_quality WHERE $__timeFilter(time) GROUP BY source",
+          "format": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Calidad por origen",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT time, source metric, CAST(valid_ratio_pct AS double) value FROM tfm.iot_gold.data_quality WHERE $__timeFilter(time) ORDER BY 1,2",
+          "format": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "type": "table",
+      "title": "Sensores con problemas",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT source,entity_id,area_id,minutes_since_received,activity_status,last_quality_flag FROM tfm.iot_gold.sensor_health WHERE activity_status<>'active' OR last_quality_flag<>'ok' ORDER BY minutes_since_received DESC NULLS FIRST",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
         "overrides": []
       }
     }

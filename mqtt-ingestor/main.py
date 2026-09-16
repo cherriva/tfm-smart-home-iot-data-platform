@@ -3,8 +3,10 @@
 import json
 import logging
 import os
+import re
 import ssl
 import time
+import unicodedata
 from datetime import datetime, timezone
 
 import paho.mqtt.client as mqtt
@@ -83,6 +85,24 @@ def on_message(client, userdata, message) -> None:
 
     if isinstance(event, dict):
         record = dict(event)
+        topic_parts = message.topic.split('/')
+        topic_domain = topic_parts[3] if len(topic_parts) >= 5 and topic_parts[:3] == ['tfm', 'matter', 'events'] else None
+        original_entity = str(record.get('entity_id') or topic_parts[-1])
+        domain = str(record.get('domain') or topic_domain or 'sensor')
+        normalized_entity = unicodedata.normalize('NFKD', original_entity).encode('ascii', 'ignore').decode().lower()
+        if '.' in normalized_entity:
+            normalized_entity = normalized_entity.split('.', 1)[1]
+        normalized_entity = re.sub(r'[^a-z0-9_]+', '_', normalized_entity).strip('_') or 'unknown'
+        normalized_domain = re.sub(r'[^a-z0-9_]+', '_', domain.lower()).strip('_') or 'sensor'
+        record['entity_id'] = f'{normalized_domain}.{normalized_entity}'
+        record['domain'] = normalized_domain
+        original_source = record.get('source')
+        record['source'] = 'matter' if message.topic.startswith('tfm/matter/events/') else original_source
+        attrs = dict(record.get('attributes') or {}) if isinstance(record.get('attributes'), dict) else {}
+        attrs['original_entity_id'] = original_entity
+        if original_source and original_source != record['source']:
+            attrs['original_source'] = original_source
+        record['attributes'] = attrs
         record["mqtt_topic"] = message.topic
         record["bridge_timestamp"] = datetime.now(timezone.utc).isoformat()
         key = str(record.get("entity_id", message.topic))

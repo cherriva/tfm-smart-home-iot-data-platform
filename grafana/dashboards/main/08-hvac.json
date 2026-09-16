@@ -1,0 +1,207 @@
+{
+  "uid": "tfm-hvac",
+  "title": "🔥 Climatización y Eficiencia",
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "5m",
+  "time": {
+    "from": "now-40d",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Horas HVAC",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT coalesce(CAST(sum(hvac_active_minutes) AS double)/60, 0.0) AS value FROM tfm.iot_gold.hvac_hourly WHERE $__timeFilter(time)",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "h"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Horas calefacción",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT coalesce(CAST(sum(heating_minutes) AS double)/60, 0.0) AS value FROM tfm.iot_gold.hvac_hourly WHERE $__timeFilter(time)",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "h"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Horas refrigeración",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT coalesce(CAST(sum(cooling_minutes) AS double)/60, 0.0) AS value FROM tfm.iot_gold.hvac_hourly WHERE $__timeFilter(time)",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "h"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Consigna media",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT avg(target_temperature_c) value FROM tfm.iot_gold.hvac_hourly WHERE $__timeFilter(time)",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Temperatura y consigna",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT c.time, c.room metric, c.temperature_c value FROM tfm.iot_gold.comfort_hourly c WHERE c.temperature_c BETWEEN -40 AND 35 AND $__timeFilter(c.time) UNION ALL SELECT h.time, concat(h.room,' · consigna') metric, h.target_temperature_c value FROM tfm.iot_gold.hvac_hourly h WHERE $__timeFilter(h.time) ORDER BY 1,2",
+          "format": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "state-timeline",
+      "title": "Estado HVAC",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT time, room metric, CASE WHEN heating_minutes>0 THEN 'HEATING' WHEN cooling_minutes>0 THEN 'COOLING' WHEN hvac_active_minutes>0 THEN 'ON' ELSE 'OFF' END value FROM tfm.iot_gold.hvac_hourly WHERE $__timeFilter(time) ORDER BY 1,2",
+          "format": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "barchart",
+      "title": "Tiempo por habitación",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT room, CAST(sum(heating_minutes) AS double)/60 AS heating_hours, CAST(sum(cooling_minutes) AS double)/60 AS cooling_hours FROM tfm.iot_gold.hvac_hourly WHERE $__timeFilter(time) GROUP BY room ORDER BY sum(hvac_active_minutes) DESC",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "h"
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

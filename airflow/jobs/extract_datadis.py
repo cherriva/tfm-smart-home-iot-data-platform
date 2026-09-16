@@ -34,7 +34,8 @@ def request(method, url, **kwargs):
             raise DatadisError('Datadis: fallo de conexión o timeout') from None
         if response.status_code == 429 and attempt < 2:
             try:
-                delay = min(max(int(response.headers.get('Retry-After', '5')), 1), 60)
+                # Respect Datadis' retry hint, with a longer cap for rate limits.
+                delay = min(max(int(response.headers.get('Retry-After', '15')), 1), 120)
             except ValueError:
                 delay = 5
             time.sleep(delay)
@@ -185,7 +186,7 @@ WHEN NOT MATCHED THEN INSERT ({', '.join(columns)}) VALUES ({', '.join('s.' + co
 
 def run(as_of: date | None = None) -> dict:
     as_of = as_of or datetime.now(timezone.utc).date()
-    months = months_ending(as_of, int(os.getenv('DATADIS_LOOKBACK_MONTHS', '2')))
+    months = months_ending(as_of, int(os.getenv('DATADIS_LOOKBACK_MONTHS', '3')))
     token, all_rows, bronze = login(), [], []
     supply_list = supplies(token)
     request_delay = max(0, int(os.getenv('DATADIS_REQUEST_DELAY_SECONDS', '65')))

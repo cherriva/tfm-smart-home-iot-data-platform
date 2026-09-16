@@ -1,18 +1,18 @@
 {
-  "uid": "tfm-home-overview",
-  "title": "🏠 Home Overview",
+  "uid": "tfm-energy",
+  "title": "⚡ Energía y Coste",
   "schemaVersion": 41,
   "version": 1,
   "refresh": "5m",
   "time": {
-    "from": "now-40d",
+    "from": "now-30d",
     "to": "now"
   },
   "panels": [
     {
       "id": 1,
       "type": "stat",
-      "title": "Temperatura media actual",
+      "title": "Energía real hoy · Datadis",
       "gridPos": {
         "h": 4,
         "w": 6,
@@ -26,13 +26,13 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT avg(numeric_state) value FROM tfm.iot_gold.room_latest_state WHERE device_class='temperature'",
+          "rawSQL": "SELECT coalesce(sum(grid_energy_kwh),0) value FROM tfm.iot_gold.energy_daily WHERE day=current_date",
           "format": 1
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "celsius"
+          "unit": "kWh"
         },
         "overrides": []
       }
@@ -40,7 +40,7 @@
     {
       "id": 2,
       "type": "stat",
-      "title": "Humedad media actual",
+      "title": "Energía real este mes · Datadis",
       "gridPos": {
         "h": 4,
         "w": 6,
@@ -54,13 +54,13 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT avg(numeric_state) value FROM tfm.iot_gold.room_latest_state WHERE device_class='humidity'",
+          "rawSQL": "SELECT coalesce(sum(grid_energy_kwh),0) value FROM tfm.iot_gold.energy_daily WHERE date_trunc('month',day)=date_trunc('month',current_date)",
           "format": 1
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percent"
+          "unit": "kWh"
         },
         "overrides": []
       }
@@ -68,7 +68,7 @@
     {
       "id": 3,
       "type": "stat",
-      "title": "CO₂ medio actual",
+      "title": "Coste hoy",
       "gridPos": {
         "h": 4,
         "w": 6,
@@ -82,13 +82,13 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT avg(numeric_state) value FROM tfm.iot_gold.room_latest_state WHERE device_class='carbon_dioxide'",
+          "rawSQL": "SELECT coalesce(sum(estimated_cost_eur),0) value FROM tfm.iot_gold.energy_daily WHERE day=current_date",
           "format": 1
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "ppm"
+          "unit": "currencyEUR"
         },
         "overrides": []
       }
@@ -96,12 +96,40 @@
     {
       "id": 4,
       "type": "stat",
-      "title": "Potencia estimada actual",
+      "title": "Coste este mes",
       "gridPos": {
         "h": 4,
         "w": 6,
         "x": 18,
         "y": 0
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT coalesce(sum(estimated_cost_eur),0) value FROM tfm.iot_gold.energy_daily WHERE date_trunc('month',day)=date_trunc('month',current_date)",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyEUR"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Potencia estimada actual",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 4
       },
       "datasource": {
         "type": "trino-datasource",
@@ -122,37 +150,9 @@
       }
     },
     {
-      "id": 5,
-      "type": "stat",
-      "title": "Confort global",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 4
-      },
-      "datasource": {
-        "type": "trino-datasource",
-        "uid": "tfm-trino"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "rawSQL": "SELECT avg(comfort_score) value FROM tfm.iot_gold.comfort_hourly WHERE $__timeFilter(time)",
-          "format": 1
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent"
-        },
-        "overrides": []
-      }
-    },
-    {
       "id": 6,
       "type": "stat",
-      "title": "Estancias ocupadas",
+      "title": "Pico de potencia",
       "gridPos": {
         "h": 4,
         "w": 6,
@@ -166,13 +166,13 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT count_if(occupied) value FROM tfm.iot_gold.occupancy_hourly WHERE time=(SELECT max(time) FROM tfm.iot_gold.occupancy_hourly)",
+          "rawSQL": "SELECT max(peak_power_kw) value FROM tfm.iot_gold.energy_daily WHERE $__timeFilter(CAST(day AS timestamp))",
           "format": 1
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "kW"
         },
         "overrides": []
       }
@@ -180,7 +180,7 @@
     {
       "id": 7,
       "type": "stat",
-      "title": "Accesos abiertos",
+      "title": "Consumo base",
       "gridPos": {
         "h": 4,
         "w": 6,
@@ -194,13 +194,13 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT count(*) value FROM tfm.iot_gold.room_latest_state WHERE (device_class IN ('door','window','opening') OR entity_id LIKE '%door%' OR entity_id LIKE '%window%') AND lower(state) IN ('on','open','unlocked')",
+          "rawSQL": "SELECT avg(baseline_power_kw)*1000 value FROM tfm.iot_gold.energy_daily WHERE $__timeFilter(CAST(day AS timestamp))",
           "format": 1
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "watt"
         },
         "overrides": []
       }
@@ -208,7 +208,7 @@
     {
       "id": 8,
       "type": "stat",
-      "title": "Calidad del dato",
+      "title": "Última ingesta Datadis",
       "gridPos": {
         "h": 4,
         "w": 6,
@@ -222,53 +222,23 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT 100*sum(valid_events)/nullif(sum(received_events),0) value FROM tfm.iot_gold.data_quality WHERE $__timeFilter(time)",
+          "rawSQL": "SELECT coalesce(CAST(max(day) FILTER (WHERE grid_energy_kwh IS NOT NULL) AS varchar),'Sin ingesta') value FROM tfm.iot_gold.energy_daily",
           "format": 1
         }
       ],
       "fieldConfig": {
-        "defaults": {
-          "unit": "percent"
-        },
+        "defaults": {},
         "overrides": []
       }
     },
     {
       "id": 9,
       "type": "timeseries",
-      "title": "Temperatura por estancia",
+      "title": "Perfil de potencia",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 8
-      },
-      "datasource": {
-        "type": "trino-datasource",
-        "uid": "tfm-trino"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "rawSQL": "SELECT time, room metric, temperature_c value FROM tfm.iot_gold.comfort_hourly WHERE $__timeFilter(time) ORDER BY 1,2",
-          "format": 0
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "celsius"
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 10,
-      "type": "timeseries",
-      "title": "Potencia del hogar",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
         "y": 8
       },
       "datasource": {
@@ -290,9 +260,37 @@
       }
     },
     {
+      "id": 10,
+      "type": "barchart",
+      "title": "Consumo diario",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "datasource": {
+        "type": "trino-datasource",
+        "uid": "tfm-trino"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSQL": "SELECT day, coalesce(max(grid_energy_kwh),sum(estimated_energy_kwh)) energy_kwh FROM tfm.iot_gold.energy_daily WHERE $__timeFilter(CAST(day AS timestamp)) GROUP BY day ORDER BY day",
+          "format": 1
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "kWh"
+        },
+        "overrides": []
+      }
+    },
+    {
       "id": 11,
-      "type": "table",
-      "title": "Estado actual por estancia",
+      "type": "barchart",
+      "title": "Distribución estimada por estancia",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -306,19 +304,21 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT area_id estancia,entity_id,state,numeric_state,unit,device_class,event_time FROM tfm.iot_gold.room_latest_state ORDER BY 1,2",
+          "rawSQL": "SELECT room, sum(estimated_energy_kwh) energy_kwh FROM tfm.iot_gold.energy_room_daily WHERE $__timeFilter(CAST(day AS timestamp)) GROUP BY room ORDER BY 2 DESC",
           "format": 1
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "unit": "kWh"
+        },
         "overrides": []
       }
     },
     {
       "id": 12,
-      "type": "barchart",
-      "title": "Confort por habitación",
+      "type": "heatmap",
+      "title": "Consumo por hora del día",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -332,13 +332,13 @@
       "targets": [
         {
           "refId": "A",
-          "rawSQL": "SELECT room,avg(comfort_score) comfort_pct FROM tfm.iot_gold.comfort_hourly WHERE $__timeFilter(time) GROUP BY room ORDER BY 2 DESC",
-          "format": 1
+          "rawSQL": "SELECT time, CAST(hour(time) AS varchar) metric, sum(energy_kwh) value FROM tfm.iot_gold.energy_hourly WHERE $__timeFilter(time) GROUP BY 1,2 ORDER BY 1",
+          "format": 0
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percent"
+          "unit": "kWh"
         },
         "overrides": []
       }

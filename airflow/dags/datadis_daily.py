@@ -18,7 +18,11 @@ def datadis_daily():
         from extract_datadis import run
         context = get_current_context()
         configured = (context['dag_run'].conf or {}).get('as_of')
-        target = date.fromisoformat(configured) if configured else context['data_interval_end'].in_timezone('Europe/Madrid').date()
+        if configured:
+            target = date.fromisoformat(configured)
+        else:
+            anchor = context.get('data_interval_end') or context['dag_run'].run_after
+            target = pendulum.instance(anchor).in_timezone('Europe/Madrid').date()
         return run(target)
     @task(execution_timeout=timedelta(minutes=5))
     def build_gold():

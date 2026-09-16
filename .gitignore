@@ -33,6 +33,8 @@ dbt/dbt_packages/
 # Local data and OS/editor artefacts
 data/private/
 matter_inventory.csv
+*.backup.*
+*.previous.*
 .idea/
 .vscode/
 **/.ipynb_checkpoints/
